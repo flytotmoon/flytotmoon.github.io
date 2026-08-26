@@ -132,6 +132,12 @@ async function main() {
   const badFile = await api('/api/config-file?file=..%2Fpackage.json');
   assert('越权文件被拒绝', badFile.status === 400);
 
+  // 千言万语（essay.yml）
+  const essay = await api('/api/essay');
+  assert('读取千言万语', essay.status === 200 && typeof essay.data.content === 'string' && essay.data.content.includes('essay_list'));
+  const essayPut = await api('/api/essay', { method: 'PUT', body: JSON.stringify({ content: essay.data.content }) });
+  assert('写回千言万语（触发备份）', essayPut.status === 200);
+
   // 媒体上传（1x1 透明 PNG）
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   const fd = new FormData();

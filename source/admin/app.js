@@ -586,6 +586,19 @@ async function githubApi(path, opts = {}) {
       return wrap({ updated });
     }
 
+    /* ---- 千言万语（essay.yml） ---- */
+    if (p === '/api/essay' && method === 'GET') {
+      const { text } = await ghReadFile(prefix + '/_data/essay.yml');
+      return wrap({ content: text });
+    }
+    if (p === '/api/essay' && method === 'PUT') {
+      if (typeof body.content !== 'string') throw new Error('缺少内容');
+      const filePath = prefix + '/_data/essay.yml';
+      const { sha } = await ghReadFile(filePath);
+      await ghWriteFile(filePath, body.content, sha, 'admin: 更新千言万语');
+      return wrap({ message: '保存成功（Git 历史即备份，约 2~5 分钟后自动上线）' });
+    }
+
     /* ---- 原始配置文件 ---- */
     if (p === '/api/config-file' && method === 'GET') {
       const name = q.get('file') || '';
@@ -910,6 +923,7 @@ const PAGE_TITLES = {
   dashboard: '仪表盘',
   posts: '文章管理',
   drafts: '草稿箱',
+  essay: '千言万语',
   editor: '编辑文章',
   media: '媒体库',
   settings: '站点设置',
@@ -943,6 +957,7 @@ function route() {
     case 'dashboard': renderDashboard(container); break;
     case 'posts': renderPosts(container, 'posts'); break;
     case 'drafts': renderPosts(container, 'drafts'); break;
+    case 'essay': renderEssay(container); break;
     case 'editor': renderEditor(container, params); break;
     case 'media': renderMedia(container); break;
     case 'settings': renderSettings(container); break;
@@ -1689,6 +1704,179 @@ async function renderEditor(container, params) {
     }
   };
   document.addEventListener('keydown', window.__editorHotkey);
+}
+
+/* ------------------------------ 千言万语（essay.yml） ------------------------------ */
+
+/** 去除 YAML 标量两端的引号 */
+function cleanScalar(v) {
+  let s = String(v == null ? '' : v).trim();
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1);
+  }
+  return s;
+}
+
+/** 轻量解析 essay.yml（预览用）：返回 [{ title, subTitle, tips, limit, entries: [...] }] */
+function parseEssayYaml(text) {
+  const groups = [];
+  let current = null;
+  let entry = null;
+  let arrKey = null; // 正在填充的数组字段（image/video）或 aplayer 对象
+  const lines = String(text || '').split(/\r?\n/);
+
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+
+    // 分组起始：- title: xxx
+    const gm = /^-\s+title:\s*(.*)$/.exec(line);
+    if (gm) {
+      current = { title: cleanScalar(gm[1]), subTitle: '', tips: '', limit: 30, entries: [] };
+      groups.push(current);
+      entry = null;
+      arrKey = null;
+      continue;
+    }
+    if (!current) continue;
+
+    // 条目起始：    - content: xxx（4 空格）
+    const em = /^\s{4}-\s+content:\s*(.*)$/.exec(line);
+    if (em) {
+      entry = { content: cleanScalar(em[1]), date: '', image: [], video: [], aplayer: null, link: '', from: '', address: '' };
+      current.entries.push(entry);
+      arrKey = null;
+      continue;
+    }
+
+    // 8 空格：数组项（- url）或 aplayer 字段（id: / server:）
+    if (entry) {
+      const arrItem = /^\s{8}-\s+(.*)$/.exec(line);
+      if (arrItem) {
+        if (arrKey === 'image' || arrKey === 'video') entry[arrKey].push(cleanScalar(arrItem[1]));
+        continue;
+      }
+      const ap = /^\s{8}([\w-]+):\s*(.*)$/.exec(line);
+      if (ap && arrKey === 'aplayer') {
+        entry.aplayer = entry.aplayer || {};
+        entry.aplayer[ap[1]] = cleanScalar(ap[2]);
+        continue;
+      }
+      // 6 空格：条目字段
+      const ef = /^\s{6}([\w-]+):\s*(.*)$/.exec(line);
+      if (ef) {
+        const key = ef[1];
+        const val = ef[2].trim();
+        if (key === 'date' || key === 'link' || key === 'from' || key === 'address') entry[key] = cleanScalar(val);
+        else if (key === 'image' || key === 'video') { arrKey = key; if (val) entry[key].push(cleanScalar(val)); }
+        else if (key === 'aplayer') { arrKey = 'aplayer'; entry.aplayer = {}; }
+        continue;
+      }
+    }
+
+    // 2 空格：分组字段
+    const gf = /^\s{2}([\w-]+):\s*(.*)$/.exec(line);
+    if (gf && gf[1] !== 'essay_list') {
+      const key = gf[1];
+      if (key === 'limit') current.limit = parseInt(gf[2], 10) || 30;
+      else if (key === 'home_essay') current.home_essay = cleanScalar(gf[2]);
+      else current[key] = cleanScalar(gf[2]);
+    }
+  }
+  return groups;
+}
+
+async function renderEssay(container) {
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <h3>千言万语 · 即刻短文</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" id="essay-add">＋ 添加新条目</button>
+          <button class="btn btn-primary btn-sm" id="essay-save">💾 保存</button>
+        </div>
+      </div>
+      <div class="card-body essay-grid" id="essay-grid">
+        <div>
+          <textarea class="code-editor" id="essay-editor" style="min-height:520px" spellcheck="false"></textarea>
+          <p class="hint" id="essay-hint">编辑的是 source/_data/essay.yml（YAML 格式）。${MODE === 'github' ? '保存即自动触发构建，约 2~5 分钟上线。' : '保存前自动备份原文件。'}</p>
+        </div>
+        <div>
+          <div class="hint" style="margin:0 0 10px">实时预览（博客「千言万语」页效果）</div>
+          <div id="essay-preview"></div>
+        </div>
+      </div>
+    </div>`;
+
+  const ta = $('#essay-editor');
+  const preview = $('#essay-preview');
+
+  const renderPreview = () => {
+    const groups = parseEssayYaml(ta.value);
+    if (!groups.length) {
+      preview.innerHTML = '<div class="empty-state">未解析到条目<br>请检查 YAML 格式</div>';
+      return;
+    }
+    preview.innerHTML = groups.map((g) => `
+      <div class="essay-group">
+        <div class="essay-group-head">
+          <b>${esc(g.title || '未命名分组')}</b>
+          <span>${esc(g.subTitle || '')}</span>
+        </div>
+        <div class="essay-group-body">
+          ${g.entries.length ? g.entries.map((e) => `
+            <div class="essay-item">
+              <p>${esc(e.content)}</p>
+              <div class="essay-item-foot">
+                <span class="chip gray">🕐 ${esc(e.date || '无日期')}</span>
+                ${e.link ? `<span class="chip blue">🔗 链接</span>` : ''}
+                ${e.from ? `<span class="chip gray">🔥 ${esc(e.from)}</span>` : ''}
+                ${e.address ? `<span class="chip gray">📍 ${esc(e.address)}</span>` : ''}
+                ${e.image.length ? `<span class="chip blue">🖼️ ${e.image.length} 图</span>` : ''}
+                ${e.video.length ? `<span class="chip blue">🎬 ${e.video.length} 视频</span>` : ''}
+              </div>
+            </div>`).join('') : '<div class="empty-state">该分组暂无短文</div>'}
+        </div>
+      </div>`).join('');
+  };
+
+  ta.addEventListener('input', debounce(renderPreview, 250));
+
+  // 加载
+  try {
+    const data = await api('/api/essay');
+    ta.value = data.content || '';
+    renderPreview();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+
+  // 添加新条目：在文末追加模板
+  $('#essay-add').addEventListener('click', () => {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    const today = `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())}`;
+    const tpl = `\n    - content: 写点什么吧…\n      date: ${today}\n`;
+    ta.value = ta.value.replace(/\s*$/, '') + tpl;
+    renderPreview();
+    ta.scrollTop = ta.scrollHeight;
+    toast('已在末尾添加新条目，替换文字后保存即可', 'ok');
+  });
+
+  // 保存
+  $('#essay-save').addEventListener('click', async () => {
+    const groups = parseEssayYaml(ta.value);
+    if (!groups.length) {
+      const ok = await confirmModal('格式检查未通过', '没有解析到任何条目，确定仍要保存吗？（可能因格式错误导致博客构建失败）', true);
+      if (!ok) return;
+    }
+    try {
+      const data = await api('/api/essay', { method: 'PUT', body: JSON.stringify({ content: ta.value }) });
+      toast(data.message || '保存成功', 'ok', 3200);
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  });
 }
 
 /* ------------------------------ 媒体库 ------------------------------ */

@@ -1,0 +1,45 @@
+
+- class_name: 北京之旅
+  path_name: /beijing-trip
+  type: 1
+  description: 这里存放的是有关我在北京游玩的点滴记录。
+  top_link: /album
+  top_btn_text: 返回
+  top_background: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/Abbey%20Road%20(Remastered)_109951163180920481.jpg
+  cover: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/Abbey%20Road%20(Remastered)_109951163180920481.jpg
+  album_list:
+    - date: 2025-06-21
+      content: 天安门
+      address: 北京
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/IMG_20251006_013255.jpg
+       
+    - date: 2025-06-21
+      content: 故宫
+      address: 北京
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/IMG_20251006_013649.jpg
+    
+    - date: 2025-06-21
+      content: 北海公园
+      address: 北京
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/IMG_20251006_014035.jpg
+
+    - date: 2025-06-21
+      content: 北海公园
+      address: 北京
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/IMG_20251006_014137.jpg
+    
+    - date: 2025-06-21
+      content: 大修红墙
+      address: 北京
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/e8f9c05358f93122eac4c84b984bdc54.jpg
+
+    - date: 2025-06-21
+      content: 太和殿
+      address: 北京
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/416ae33d814e84e2af8b47eacdf71767.jpg

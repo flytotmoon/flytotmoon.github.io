@@ -1,0 +1,13 @@
+.DS_Store
+Thumbs.db
+db.json
+*.log
+node_modules/
+public/
+.deploy*/
+_multiconfig.yml
+
+# 后台管理系统：配置（含密码哈希与密钥）、回收站、备份 不提交到仓库
+admin/config.json
+admin/trash/
+admin/backups/

@@ -1,0 +1,70 @@
+# ============================================================
+# flytotmoon 博客自动构建部署工作流
+#
+# 用途：为「GitHub 云端后台」提供在线构建能力。
+# 当源码分支（默认 source）有推送，或在线后台触发
+# workflow_dispatch 时，自动执行 hexo generate 并把构建产物
+# 强制推送到 Pages 分支（master，即 flytotmoon.github.io 默认分支）。
+#
+# 注意：
+#   - 本文件需要放在「源码分支」上（与 package.json 同一仓库层级）
+#   - master 分支由本工作流自动覆盖，请勿手动编辑其内容
+#   - 若 themes/anzhiyu 以 git submodule 方式引入，请保持下面
+#     checkout 步骤中的 submodules: 'recursive'
+# ============================================================
+
+name: Auto Deploy Blog
+
+on:
+  push:
+    branches:
+      - source # 源码分支（按实际修改）
+  workflow_dispatch: # 允许在线后台通过 API 触发
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 安装 pandoc（hexo-renderer-pandoc 依赖）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
+      - name: 安装主题（若 themes/anzhiyu 未随源码提交，作为兜底克隆）
+        run: |
+          if [ ! -f themes/anzhiyu/package.json ]; then
+            echo "themes/anzhiyu 未随源码提交，正在克隆官方主题…"
+            git clone --depth 1 https://github.com/anzhiyu-c/hexo-theme-anzhiyu.git themes/anzhiyu
+          else
+            echo "themes/anzhiyu 已随源码提交"
+          fi
+
+      - name: 安装依赖
+        run: npm ci || npm install
+
+      - name: 生成静态文件
+        run: npx hexo clean && npx hexo generate
+
+      - name: 部署到 Pages 分支
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          publish_branch: master # Pages 分支（flytotmoon.github.io 的默认分支）
+          force_orphan: true
+          commit_message: 'auto deploy: ${{ github.event.head_commit.message }}'
+          cname: blog.flytotmoon.cn

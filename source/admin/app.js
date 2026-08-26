@@ -167,7 +167,12 @@ async function ghFetch(path, opts = {}) {
   let data = null;
   try { data = await res.json(); } catch (e) { /* 204 等无内容 */ }
   if (!res.ok) {
-    const msg = data && (data.message || data.error) ? String(data.message || data.error) : `GitHub 请求失败 (${res.status})`;
+    const raw = data && (data.message || data.error) ? String(data.message || data.error) : '';
+    // 限流错误给出友好提示
+    if (res.status === 403 && /rate limit/i.test(raw)) {
+      throw Object.assign(new Error('GitHub API 限流（请求过于频繁）：请稍等 1~2 分钟再操作'), { status: res.status });
+    }
+    const msg = raw || `GitHub 请求失败 (${res.status})`;
     const err = new Error(msg);
     err.status = res.status;
     throw err;
@@ -179,7 +184,8 @@ let ghTreeCache = null;
 let ghTreeTime = 0;
 
 async function ghTree(force) {
-  if (!force && ghTreeCache && Date.now() - ghTreeTime < 30000) return ghTreeCache;
+  // 目录树缓存 2 分钟，减少 API 请求频率（后台写入时会 force 刷新）
+  if (!force && ghTreeCache && Date.now() - ghTreeTime < 120000) return ghTreeCache;
   const data = await ghFetch(`${ghRepo()}/git/trees/${encodeURIComponent(GH.branch)}?recursive=1`);
   ghTreeCache = data;
   ghTreeTime = Date.now();
@@ -978,7 +984,13 @@ function closeSidebar() {
 
 async function loadNavBadges() {
   try {
-    const meta = await api('/api/meta');
+    // meta 缓存 60 秒，减少 GitHub API 调用频率
+    const now = Date.now();
+    if (!window.__metaCache || !window.__metaTime || now - window.__metaTime > 60000) {
+      window.__metaCache = await api('/api/meta');
+      window.__metaTime = now;
+    }
+    const meta = window.__metaCache;
     const badge = $('#draft-count-badge');
     if (meta.drafts > 0) {
       badge.textContent = meta.drafts;
@@ -986,7 +998,6 @@ async function loadNavBadges() {
     } else {
       badge.classList.add('hidden');
     }
-    window.__metaCache = meta;
   } catch (e) {
     /* ignore */
   }
@@ -2030,6 +2041,11 @@ async function renderBuild(container) {
             else if (job.status === 'done') appendLog('✓ 构建部署完成，博客已更新', 'c-ok');
             else appendLog('✗ 构建失败，请点击「查看 GitHub Actions」排查', 'c-err');
           }
+          // 构建结束后停止轮询，避免持续消耗 API 配额
+          if (!st.running && job.status !== 'running' && window.__buildPollGh) {
+            clearInterval(window.__buildPollGh);
+            window.__buildPollGh = null;
+          }
         }
       } catch (e) { /* 轮询失败忽略 */ }
     };
@@ -2038,6 +2054,8 @@ async function renderBuild(container) {
       try {
         await api('/api/build', { method: 'POST', body: JSON.stringify({ action: 'deploy' }) });
         appendLog('🚀 已触发 GitHub Actions 工作流（约 2~5 分钟完成）', 'c-ok');
+        // 确保轮询开启（若上次构建结束后已停止）
+        if (!window.__buildPollGh) window.__buildPollGh = setInterval(updateStatus, 5000);
         updateStatus();
       } catch (e) {
         toast(e.message, 'error');

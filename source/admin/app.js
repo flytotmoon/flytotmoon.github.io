@@ -631,6 +631,16 @@ async function githubApi(path, opts = {}) {
       logout(false);
       throw new Error('GitHub 令牌无效或已过期，请重新连接');
     }
+    // 构建相关接口的权限错误给出明确指引
+    if (e && e.status === 403 && (p.includes('/api/build') || p === '/api/build/status')) {
+      throw new Error('令牌缺少 Workflows 权限（403）：请到 GitHub → Settings → Developer settings → Personal access tokens，给令牌的仓库权限勾选 Workflows: Read and write，保存后重新连接');
+    }
+    if (e && e.status === 422 && p === '/api/build') {
+      throw new Error('工作流不支持手动触发（422）：请确认 .github/workflows/auto-deploy.yml 已推送到源码分支且包含 workflow_dispatch');
+    }
+    if (e && e.status === 404 && p === '/api/build') {
+      throw new Error('未找到构建工作流（404）：请确认 .github/workflows/auto-deploy.yml 在源码分支上');
+    }
     throw e;
   }
 }

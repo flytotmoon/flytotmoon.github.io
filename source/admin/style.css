@@ -307,6 +307,13 @@ input, textarea, select {
 .login-panel-foot a { color: var(--brand); font-weight: 500; }
 .login-panel-foot a:hover { text-decoration: underline; }
 
+.login-ver {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #b3b8c6;
+  text-align: center;
+}
+
 .field { display: block; margin-bottom: 16px; }
 .field > span { display: block; margin-bottom: 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
 

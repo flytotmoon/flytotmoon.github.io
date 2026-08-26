@@ -930,6 +930,22 @@ async function handleApi(req, res, urlObj, user) {
     return sendJSON(res, 200, { ok: true, message: '已删除' });
   }
 
+  /* ---- 自我介绍（about.yml） ---- */
+  if (pathname === '/api/about' && method === 'GET') {
+    const file = path.join(ROOT, 'source', '_data', 'about.yml');
+    const text = await fsp.readFile(file, 'utf8');
+    return sendJSON(res, 200, { ok: true, content: text });
+  }
+  if (pathname === '/api/about' && method === 'PUT') {
+    const body = await readJSON(req);
+    if (typeof body.content !== 'string') return sendJSON(res, 400, { ok: false, message: '缺少内容' });
+    const file = path.join(ROOT, 'source', '_data', 'about.yml');
+    await backupFile(file);
+    await fsp.writeFile(file, body.content, 'utf8');
+    log('已保存自我介绍（about.yml，已自动备份）');
+    return sendJSON(res, 200, { ok: true, message: '保存成功，已自动备份原文件' });
+  }
+
   /* ---- 相册集（album.yml） ---- */
   if (pathname === '/api/album' && method === 'GET') {
     const file = path.join(ROOT, 'source', '_data', 'album.yml');

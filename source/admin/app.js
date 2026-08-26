@@ -586,6 +586,19 @@ async function githubApi(path, opts = {}) {
       return wrap({ updated });
     }
 
+    /* ---- 自我介绍（about.yml） ---- */
+    if (p === '/api/about' && method === 'GET') {
+      const { text } = await ghReadFile(prefix + '/_data/about.yml');
+      return wrap({ content: text });
+    }
+    if (p === '/api/about' && method === 'PUT') {
+      if (typeof body.content !== 'string') throw new Error('缺少内容');
+      const filePath = prefix + '/_data/about.yml';
+      const { sha } = await ghReadFile(filePath);
+      await ghWriteFile(filePath, body.content, sha, 'admin: 更新自我介绍');
+      return wrap({ message: '保存成功（Git 历史即备份，约 2~5 分钟后自动上线）' });
+    }
+
     /* ---- 相册集（album.yml） ---- */
     if (p === '/api/album' && method === 'GET') {
       const { text } = await ghReadFile(prefix + '/_data/album.yml');
@@ -938,6 +951,7 @@ const PAGE_TITLES = {
   drafts: '草稿箱',
   essay: '千言万语',
   album: '相册集',
+  about: '自我介绍',
   editor: '编辑文章',
   media: '媒体库',
   settings: '站点设置',
@@ -973,6 +987,7 @@ function route() {
     case 'drafts': renderPosts(container, 'drafts'); break;
     case 'essay': renderEssay(container); break;
     case 'album': renderAlbum(container); break;
+    case 'about': renderAbout(container); break;
     case 'editor': renderEditor(container, params); break;
     case 'media': renderMedia(container); break;
     case 'settings': renderSettings(container); break;
@@ -1719,6 +1734,125 @@ async function renderEditor(container, params) {
     }
   };
   document.addEventListener('keydown', window.__editorHotkey);
+}
+
+/* ------------------------------ 自我介绍（about.yml） ------------------------------ */
+
+/** 轻量解析 about.yml（预览用）：提取顶部信息与分区概览 */
+function parseAboutYaml(text) {
+  const info = { className: '', name: '', description: '', subtitle: '', avatarImg: '', helloAbout: '', sections: [] };
+  let current = null;
+  const lines = String(text || '').split(/\r?\n/);
+
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+
+    const gm = /^-\s+class_name:\s*(.*)$/.exec(line);
+    if (gm) {
+      info.className = cleanScalar(gm[1]);
+      continue;
+    }
+    // 顶层 2 空格分区
+    const sec = /^\s{2}([\w-]+):\s*(.*)$/.exec(line);
+    if (sec) {
+      current = { key: sec[1], value: cleanScalar(sec[2]), subCount: 0 };
+      info.sections.push(current);
+      continue;
+    }
+    // 更深层级：计入所属分区的子项行数
+    if (current && /^\s{4,}\S/.test(line)) current.subCount += 1;
+  }
+
+  const pick = (key) => {
+    const s = info.sections.find((x) => x.key === key);
+    return s ? s.value : '';
+  };
+  info.name = pick('name');
+  info.description = pick('description');
+  info.subtitle = pick('subtitle');
+  info.avatarImg = pick('avatarImg');
+  info.helloAbout = pick('helloAbout');
+  return info;
+}
+
+async function renderAbout(container) {
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <h3>自我介绍 · 关于页</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" id="about-save">💾 保存</button>
+        </div>
+      </div>
+      <div class="card-body about-grid">
+        <div>
+          <textarea class="code-editor" id="about-editor" style="min-height:540px" spellcheck="false"></textarea>
+          <p class="hint">
+            编辑的是 source/_data/about.yml（YAML 格式），包含 20 个板块：基本信息、avatarSkills 技能、
+            aboutsiteTips、careers 书本、statistic、map、selfInfo、personalities 人格、maxim 座右铭、
+            buff 特长、game 游戏、comic 读书、like、music、reward_list 打赏等。
+            ${MODE === 'github' ? '保存即自动触发构建，约 2~5 分钟上线。' : '保存前自动备份原文件。'}
+          </p>
+        </div>
+        <div>
+          <div class="hint" style="margin:0 0 10px">实时预览（博客「关于」页效果概览）</div>
+          <div id="about-preview"></div>
+        </div>
+      </div>
+    </div>`;
+
+  const ta = $('#about-editor');
+  const preview = $('#about-preview');
+
+  const renderPreview = () => {
+    const info = parseAboutYaml(ta.value);
+    if (!info.sections.length) {
+      preview.innerHTML = '<div class="empty-state">未解析到内容<br>请检查 YAML 格式</div>';
+      return;
+    }
+    preview.innerHTML = `
+      <div class="about-preview-head">
+        ${info.avatarImg ? `<img src="${esc(info.avatarImg)}" alt="头像" />` : '<div class="about-noavatar"></div>'}
+        <div>
+          <b>${esc(info.name || '（未设置名字）')}</b>
+          <span>${esc(info.description || '')}</span>
+        </div>
+      </div>
+      ${info.subtitle ? `<div class="about-slogan">「${esc(info.subtitle)}」</div>` : ''}
+      ${info.helloAbout ? `<div class="about-slogan dim">${esc(info.helloAbout)}</div>` : ''}
+      <div class="about-sections">
+        ${info.sections.map((s) => `
+          <div class="about-sec">
+            <span class="about-sec-key">${esc(s.key)}</span>
+            <span class="about-sec-val">${s.value ? esc(s.value) : (s.subCount ? `复合结构 · ${s.subCount} 行` : '—')}</span>
+          </div>`).join('')}
+      </div>`;
+  };
+
+  ta.addEventListener('input', debounce(renderPreview, 250));
+
+  try {
+    const data = await api('/api/about');
+    ta.value = data.content || '';
+    renderPreview();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+
+  $('#about-save').addEventListener('click', async () => {
+    const info = parseAboutYaml(ta.value);
+    if (!info.sections.length) {
+      const ok = await confirmModal('格式检查未通过', '没有解析到任何内容，确定仍要保存吗？（可能因格式错误导致博客构建失败）', true);
+      if (!ok) return;
+    }
+    try {
+      const data = await api('/api/about', { method: 'PUT', body: JSON.stringify({ content: ta.value }) });
+      toast(data.message || '保存成功', 'ok', 3200);
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  });
 }
 
 /* ------------------------------ 相册集（album.yml） ------------------------------ */

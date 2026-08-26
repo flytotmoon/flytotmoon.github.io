@@ -144,6 +144,12 @@ async function main() {
   const albumPut = await api('/api/album', { method: 'PUT', body: JSON.stringify({ content: album.data.content }) });
   assert('写回相册集（触发备份）', albumPut.status === 200);
 
+  // 自我介绍（about.yml）
+  const about = await api('/api/about');
+  assert('读取自我介绍', about.status === 200 && typeof about.data.content === 'string' && about.data.content.includes('class_name'));
+  const aboutPut = await api('/api/about', { method: 'PUT', body: JSON.stringify({ content: about.data.content }) });
+  assert('写回自我介绍（触发备份）', aboutPut.status === 200);
+
   // 媒体上传（1x1 透明 PNG）
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   const fd = new FormData();

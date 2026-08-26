@@ -1635,7 +1635,7 @@ async function renderEditor(container, params) {
     };
   };
 
-  const GH_HINT = MODE === 'github' ? '（记得去「构建发布」页部署）' : '';
+  const GH_HINT = MODE === 'github' ? '（已自动触发构建，约 2~5 分钟后上线）' : '';
   const save = async (asDraft = false) => {
     try {
       const payload = collect();
@@ -1981,8 +1981,8 @@ async function renderBuild(container) {
           </div>
           <div class="card-body">
             <p class="hint" style="margin:0 0 14px">
-              在线后台通过 GitHub Actions 自动构建并部署博客：保存文章后，来这里点击「构建并部署」，
-              大约 2~5 分钟后博客即更新（构建产物推送到 master 分支）。
+              保存文章/草稿发布时会自动触发 GitHub Actions 构建（约 2~5 分钟上线），无需手动操作；
+              下方按钮用于未自动触发时的兜底或立即部署。
             </p>
             <div class="build-actions">
               <button class="btn btn-primary" id="b-deploy">🚀 构建并部署</button>

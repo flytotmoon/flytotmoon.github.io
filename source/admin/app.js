@@ -1249,41 +1249,51 @@ async function renderPosts(container, scope) {
 
 function chipsInput(container, initial = [], placeholder = '输入后回车') {
   const items = [...initial];
-  const render = () => {
+  const render = (keepFocus = false) => {
     container.innerHTML = `
       ${items.map((it, i) => `<span class="chip">${esc(it)}<span class="chip-x" data-i="${i}">×</span></span>`).join('')}
       <input type="text" placeholder="${esc(placeholder)}" />`;
     const input = $('input', container);
+    if (keepFocus) input.focus();
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
         e.preventDefault();
         const v = input.value.trim().replace(/,|，/g, '');
         if (v && !items.includes(v)) items.push(v);
         input.value = '';
-        render();
+        render(true);
       } else if (e.key === 'Backspace' && !input.value && items.length) {
         items.pop();
-        render();
+        render(true);
       }
     });
+    // 失焦只处理未确认的输入，绝不抢焦点（这是「光标总跳回标签框」的根源）
     input.addEventListener('blur', () => {
       const v = input.value.trim();
-      if (v && !items.includes(v)) items.push(v);
       input.value = '';
-      render();
+      if (v && !items.includes(v)) {
+        items.push(v);
+        render(false);
+      }
     });
     $$('.chip-x', container).forEach((x) => {
       x.addEventListener('click', () => {
         items.splice(Number(x.dataset.i), 1);
-        render();
+        render(false);
       });
     });
-    input.focus();
   };
-  render();
+  render(false);
+  // 点击容器空白区域时才聚焦输入框（不影响其他字段）
+  container.addEventListener('click', (e) => {
+    if (e.target === container) {
+      const input = $('input', container);
+      if (input) input.focus();
+    }
+  });
   return {
     get: () => [...items],
-    set: (arr) => { items.length = 0; items.push(...(arr || [])); render(); },
+    set: (arr) => { items.length = 0; items.push(...(arr || [])); render(false); },
   };
 }
 

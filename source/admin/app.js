@@ -586,6 +586,24 @@ async function githubApi(path, opts = {}) {
       return wrap({ updated });
     }
 
+    /* ---- 友链 / 装备 / 创意技能（data yml） ---- */
+    const DATA_MAP = {
+      '/api/link': 'link.yml',
+      '/api/equipment': 'equipment.yml',
+      '/api/creativity': 'creativity.yml',
+    };
+    if (DATA_MAP[p] && method === 'GET') {
+      const { text } = await ghReadFile(prefix + '/_data/' + DATA_MAP[p]);
+      return wrap({ content: text });
+    }
+    if (DATA_MAP[p] && method === 'PUT') {
+      if (typeof body.content !== 'string') throw new Error('缺少内容');
+      const filePath = prefix + '/_data/' + DATA_MAP[p];
+      const { sha } = await ghReadFile(filePath);
+      await ghWriteFile(filePath, body.content, sha, `admin: 更新 ${DATA_MAP[p]}`);
+      return wrap({ message: '保存成功（Git 历史即备份，约 2~5 分钟后自动上线）' });
+    }
+
     /* ---- 自我介绍（about.yml） ---- */
     if (p === '/api/about' && method === 'GET') {
       const { text } = await ghReadFile(prefix + '/_data/about.yml');
@@ -952,6 +970,9 @@ const PAGE_TITLES = {
   essay: '千言万语',
   album: '相册集',
   about: '自我介绍',
+  flink: '友链管理',
+  equipment: '我的装备',
+  creativity: '创意技能',
   editor: '编辑文章',
   media: '媒体库',
   settings: '站点设置',
@@ -988,6 +1009,9 @@ function route() {
     case 'essay': renderEssay(container); break;
     case 'album': renderAlbum(container); break;
     case 'about': renderAbout(container); break;
+    case 'flink': renderFlink(container); break;
+    case 'equipment': renderEquipment(container); break;
+    case 'creativity': renderCreativity(container); break;
     case 'editor': renderEditor(container, params); break;
     case 'media': renderMedia(container); break;
     case 'settings': renderSettings(container); break;
@@ -1734,6 +1758,295 @@ async function renderEditor(container, params) {
     }
   };
   document.addEventListener('keydown', window.__editorHotkey);
+}
+
+/* ------------------------------ 友链 / 装备 / 创意技能 ------------------------------ */
+
+/** 友链 link.yml：分组 + link_list */
+function parseLinkYaml(text) {
+  const groups = [];
+  let current = null;
+  let entry = null;
+  for (const raw of String(text || '').split(/\r?\n/)) {
+    const line = raw.replace(/\s+$/, '');
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    const gm = /^-\s+class_name:\s*(.*)$/.exec(line);
+    if (gm) {
+      current = { class_name: cleanScalar(gm[1]), flink_style: '', class_desc: '', links: [] };
+      groups.push(current);
+      entry = null;
+      continue;
+    }
+    if (!current) continue;
+    const em = /^\s{4}-\s+name:\s*(.*)$/.exec(line);
+    if (em) {
+      entry = { name: cleanScalar(em[1]), link: '', avatar: '', descr: '', siteshot: '', color: '', tag: '', recommend: false };
+      current.links.push(entry);
+      continue;
+    }
+    if (entry) {
+      const ef = /^\s{6}([\w-]+):\s*(.*)$/.exec(line);
+      if (ef) {
+        const k = ef[1];
+        const v = cleanScalar(ef[2]);
+        if (k === 'recommend') entry.recommend = v === 'true';
+        else entry[k] = v;
+        continue;
+      }
+    }
+    const gf = /^\s{2}([\w-]+):\s*(.*)$/.exec(line);
+    if (gf && gf[1] !== 'link_list') current[gf[1]] = cleanScalar(gf[2]);
+  }
+  return groups;
+}
+
+/** 装备 equipment.yml：分组 + good_things + equipment_list */
+function parseEquipmentYaml(text) {
+  const groups = [];
+  let current = null;
+  let good = null;
+  let item = null;
+  for (const raw of String(text || '').split(/\r?\n/)) {
+    const line = raw.replace(/\s+$/, '');
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    const gm = /^-\s+class_name:\s*(.*)$/.exec(line);
+    if (gm) {
+      current = { class_name: cleanScalar(gm[1]), description: '', tip: '', goods: [] };
+      groups.push(current);
+      good = null;
+      item = null;
+      continue;
+    }
+    if (!current) continue;
+    const gtm = /^\s{4}-\s+title:\s*(.*)$/.exec(line);
+    if (gtm) {
+      good = { title: cleanScalar(gtm[1]), description: '', items: [] };
+      current.goods.push(good);
+      item = null;
+      continue;
+    }
+    const itm = /^\s{6}-\s+name:\s*(.*)$/.exec(line);
+    if (itm && good) {
+      item = { name: cleanScalar(itm[1]), specification: '', description: '', image: '', link: '' };
+      good.items.push(item);
+      continue;
+    }
+    if (item) {
+      const ef = /^\s{8}([\w-]+):\s*(.*)$/.exec(line);
+      if (ef) {
+        item[ef[1]] = cleanScalar(ef[2]);
+        continue;
+      }
+    }
+    const gf = /^\s{2}([\w-]+):\s*(.*)$/.exec(line);
+    if (gf && gf[1] !== 'good_things') current[gf[1]] = cleanScalar(gf[2]);
+  }
+  return groups;
+}
+
+/** 创意技能 creativity.yml：分组 + creativity_list */
+function parseCreativityYaml(text) {
+  const groups = [];
+  let current = null;
+  let entry = null;
+  for (const raw of String(text || '').split(/\r?\n/)) {
+    const line = raw.replace(/\s+$/, '');
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    const gm = /^-\s+class_name:\s*(.*)$/.exec(line);
+    if (gm) {
+      current = { class_name: cleanScalar(gm[1]), items: [] };
+      groups.push(current);
+      entry = null;
+      continue;
+    }
+    if (!current) continue;
+    const em = /^\s{4}-\s+name:\s*(.*)$/.exec(line);
+    if (em) {
+      entry = { name: cleanScalar(em[1]), icon: '' };
+      current.items.push(entry);
+      continue;
+    }
+    if (entry) {
+      const ef = /^\s{6}([\w-]+):\s*(.*)$/.exec(line);
+      if (ef) {
+        entry[ef[1]] = cleanScalar(ef[2]);
+      }
+    }
+  }
+  return groups;
+}
+
+/** 通用数据页骨架：编辑器 + 预览 + 添加模板 + 保存 */
+async function renderDataYamlPage(container, cfg) {
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <h3>${esc(cfg.title)}</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${cfg.addLabel ? `<button class="btn btn-sm" id="data-add">＋ ${esc(cfg.addLabel)}</button>` : ''}
+          <button class="btn btn-primary btn-sm" id="data-save">💾 保存</button>
+        </div>
+      </div>
+      <div class="card-body data-grid">
+        <div>
+          <textarea class="code-editor" id="data-editor" style="min-height:520px" spellcheck="false"></textarea>
+          <p class="hint">${esc(cfg.hint)}</p>
+        </div>
+        <div>
+          <div class="hint" style="margin:0 0 10px">实时预览</div>
+          <div id="data-preview"></div>
+        </div>
+      </div>
+    </div>`;
+
+  const ta = $('#data-editor');
+  const preview = $('#data-preview');
+  const renderPreview = () => cfg.render(preview, ta.value);
+  ta.addEventListener('input', debounce(renderPreview, 250));
+
+  try {
+    const data = await api(cfg.apiPath);
+    ta.value = data.content || '';
+    renderPreview();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+
+  const addBtn = $('#data-add');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      ta.value = ta.value.replace(/\s*$/, '') + cfg.addTemplate();
+      renderPreview();
+      ta.scrollTop = ta.scrollHeight;
+      toast('已在末尾添加模板，替换内容后保存即可', 'ok');
+    });
+  }
+
+  $('#data-save').addEventListener('click', async () => {
+    if (cfg.validate && !cfg.validate(ta.value)) {
+      const ok = await confirmModal('格式检查未通过', '没有解析到任何内容，确定仍要保存吗？（可能因格式错误导致博客构建失败）', true);
+      if (!ok) return;
+    }
+    try {
+      const data = await api(cfg.apiPath, { method: 'PUT', body: JSON.stringify({ content: ta.value }) });
+      toast(data.message || '保存成功', 'ok', 3200);
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  });
+}
+
+function renderFlink(container) {
+  renderDataYamlPage(container, {
+    title: '友链管理 · 好伙伴',
+    apiPath: '/api/link',
+    addLabel: '新建分组',
+    hint: `编辑的是 source/_data/link.yml（YAML 格式）。支持 flink_style: flexcard / telescopic / anzhiyu 三种样式。${MODE === 'github' ? '保存即自动触发构建，约 2~5 分钟上线。' : '保存前自动备份原文件。'}`,
+    addTemplate: () => '\n- class_name: 新分组\n  flink_style: anzhiyu\n  link_list:\n    - name: 站点名\n      link: https://\n      avatar: https://头像地址\n      descr: 站点描述\n      recommend: true\n',
+    validate: (v) => parseLinkYaml(v).length > 0,
+    render: (preview, text) => {
+      const groups = parseLinkYaml(text);
+      if (!groups.length) {
+        preview.innerHTML = '<div class="empty-state">未解析到友链分组<br>请检查 YAML 格式</div>';
+        return;
+      }
+      preview.innerHTML = groups.map((g) => `
+        <div class="data-group">
+          <div class="data-group-head">
+            <b>${esc(g.class_name || '未命名分组')}</b>
+            <span class="chip gray">${esc(g.flink_style || '默认样式')}</span>
+            ${g.class_desc ? `<span class="data-group-desc">${esc(g.class_desc)}</span>` : ''}
+          </div>
+          <div class="data-group-body">
+            ${g.links.length ? g.links.map((l) => `
+              <div class="flink-item">
+                ${l.avatar ? `<img class="flink-avatar" src="${esc(l.avatar)}" onerror="this.style.display='none'" alt="" />` : ''}
+                <div class="flink-meta">
+                  <b>${esc(l.name)}</b>
+                  <span>${esc(l.descr || '')}</span>
+                </div>
+                <div class="data-badges">
+                  ${l.recommend ? '<span class="chip">⭐ 推荐</span>' : ''}
+                  ${l.tag ? `<span class="chip blue">${esc(l.tag)}</span>` : ''}
+                  ${l.color ? `<span class="chip gray">${esc(l.color)}</span>` : ''}
+                  ${l.link ? '<span class="chip blue">🔗 链接</span>' : ''}
+                </div>
+              </div>`).join('') : '<div class="empty-state">该分组暂无友链</div>'}
+          </div>
+        </div>`).join('');
+    },
+  });
+}
+
+function renderEquipment(container) {
+  renderDataYamlPage(container, {
+    title: '我的装备 · 好物推荐',
+    apiPath: '/api/equipment',
+    addLabel: '新建分类',
+    hint: `编辑的是 source/_data/equipment.yml（YAML 格式）。分组下可有多个 good_things 分类，每个分类下是 equipment_list。${MODE === 'github' ? '保存即自动触发构建，约 2~5 分钟上线。' : '保存前自动备份原文件。'}`,
+    addTemplate: () => '\n- class_name: 新分类\n  description: 装备推荐\n  tip: \n  good_things:\n    - title: 生产力\n      description: \n      equipment_list:\n        - name: 设备名\n          specification: \n          description: \n          image: https://图片地址\n          link: https://\n',
+    validate: (v) => parseEquipmentYaml(v).length > 0,
+    render: (preview, text) => {
+      const groups = parseEquipmentYaml(text);
+      if (!groups.length) {
+        preview.innerHTML = '<div class="empty-state">未解析到装备分类<br>请检查 YAML 格式</div>';
+        return;
+      }
+      preview.innerHTML = groups.map((g) => `
+        <div class="data-group">
+          <div class="data-group-head">
+            <b>${esc(g.class_name || '未命名分类')}</b>
+            ${g.tip ? `<span class="data-group-desc">${esc(g.tip)}</span>` : ''}
+          </div>
+          <div class="data-group-body">
+            ${g.goods.length ? g.goods.map((gt) => `
+              <div class="equip-sec">
+                <div class="equip-sec-head">${esc(gt.title || '未命名')}<span>${esc(gt.description || '')}</span></div>
+                ${gt.items.length ? gt.items.map((it) => `
+                  <div class="equip-item">
+                    ${it.image ? `<span class="equip-img" style="background-image:url('${esc(it.image)}')"></span>` : ''}
+                    <div class="equip-meta">
+                      <b>${esc(it.name)}</b>
+                      ${it.specification ? `<span class="chip gray">${esc(it.specification)}</span>` : ''}
+                      <p>${esc(it.description || '')}</p>
+                    </div>
+                  </div>`).join('') : '<div class="empty-state">该分类暂无装备</div>'}
+              </div>`).join('') : '<div class="empty-state">暂无好物分类</div>'}
+          </div>
+        </div>`).join('');
+    },
+  });
+}
+
+function renderCreativity(container) {
+  renderDataYamlPage(container, {
+    title: '创意技能 · 音乐墙',
+    apiPath: '/api/creativity',
+    addLabel: '新建分组',
+    hint: `编辑的是 source/_data/creativity.yml（YAML 格式）。每项为 name + icon（图标地址）。${MODE === 'github' ? '保存即自动触发构建，约 2~5 分钟上线。' : '保存前自动备份原文件。'}`,
+    addTemplate: () => '\n- class_name: 新分组\n  creativity_list:\n    - name: 名字\n      icon: https://图标地址\n',
+    validate: (v) => parseCreativityYaml(v).length > 0,
+    render: (preview, text) => {
+      const groups = parseCreativityYaml(text);
+      if (!groups.length) {
+        preview.innerHTML = '<div class="empty-state">未解析到分组<br>请检查 YAML 格式</div>';
+        return;
+      }
+      preview.innerHTML = groups.map((g) => `
+        <div class="data-group">
+          <div class="data-group-head"><b>${esc(g.class_name || '未命名分组')}</b><span class="chip gray">${g.items.length} 项</span></div>
+          <div class="data-group-body">
+            <div class="creative-grid">
+              ${g.items.length ? g.items.map((it) => `
+                <div class="creative-item">
+                  ${it.icon ? `<img src="${esc(it.icon)}" onerror="this.style.display='none'" alt="" />` : ''}
+                  <span>${esc(it.name)}</span>
+                </div>`).join('') : '<div class="empty-state">暂无项目</div>'}
+            </div>
+          </div>
+        </div>`).join('');
+    },
+  });
 }
 
 /* ------------------------------ 自我介绍（about.yml） ------------------------------ */

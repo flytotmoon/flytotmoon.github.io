@@ -150,6 +150,19 @@ async function main() {
   const aboutPut = await api('/api/about', { method: 'PUT', body: JSON.stringify({ content: about.data.content }) });
   assert('写回自我介绍（触发备份）', aboutPut.status === 200);
 
+  // 友链 / 装备 / 创意技能
+  const dataFiles = [
+    ['/api/link', 'link_list', '友链'],
+    ['/api/equipment', 'equipment_list', '装备'],
+    ['/api/creativity', 'creativity_list', '创意技能'],
+  ];
+  for (const [endpoint, marker, label] of dataFiles) {
+    const g = await api(endpoint);
+    assert(`读取${label}`, g.status === 200 && typeof g.data.content === 'string' && g.data.content.includes(marker));
+    const p2 = await api(endpoint, { method: 'PUT', body: JSON.stringify({ content: g.data.content }) });
+    assert(`写回${label}（触发备份）`, p2.status === 200);
+  }
+
   // 媒体上传（1x1 透明 PNG）
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   const fd = new FormData();

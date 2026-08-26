@@ -930,6 +930,51 @@ async function handleApi(req, res, urlObj, user) {
     return sendJSON(res, 200, { ok: true, message: '已删除' });
   }
 
+  /* ---- 友链（link.yml） ---- */
+  if (pathname === '/api/link' && method === 'GET') {
+    const text = await fsp.readFile(path.join(ROOT, 'source', '_data', 'link.yml'), 'utf8');
+    return sendJSON(res, 200, { ok: true, content: text });
+  }
+  if (pathname === '/api/link' && method === 'PUT') {
+    const body = await readJSON(req);
+    if (typeof body.content !== 'string') return sendJSON(res, 400, { ok: false, message: '缺少内容' });
+    const file = path.join(ROOT, 'source', '_data', 'link.yml');
+    await backupFile(file);
+    await fsp.writeFile(file, body.content, 'utf8');
+    log('已保存友链（link.yml，已自动备份）');
+    return sendJSON(res, 200, { ok: true, message: '保存成功，已自动备份原文件' });
+  }
+
+  /* ---- 装备（equipment.yml） ---- */
+  if (pathname === '/api/equipment' && method === 'GET') {
+    const text = await fsp.readFile(path.join(ROOT, 'source', '_data', 'equipment.yml'), 'utf8');
+    return sendJSON(res, 200, { ok: true, content: text });
+  }
+  if (pathname === '/api/equipment' && method === 'PUT') {
+    const body = await readJSON(req);
+    if (typeof body.content !== 'string') return sendJSON(res, 400, { ok: false, message: '缺少内容' });
+    const file = path.join(ROOT, 'source', '_data', 'equipment.yml');
+    await backupFile(file);
+    await fsp.writeFile(file, body.content, 'utf8');
+    log('已保存装备（equipment.yml，已自动备份）');
+    return sendJSON(res, 200, { ok: true, message: '保存成功，已自动备份原文件' });
+  }
+
+  /* ---- 创意技能（creativity.yml） ---- */
+  if (pathname === '/api/creativity' && method === 'GET') {
+    const text = await fsp.readFile(path.join(ROOT, 'source', '_data', 'creativity.yml'), 'utf8');
+    return sendJSON(res, 200, { ok: true, content: text });
+  }
+  if (pathname === '/api/creativity' && method === 'PUT') {
+    const body = await readJSON(req);
+    if (typeof body.content !== 'string') return sendJSON(res, 400, { ok: false, message: '缺少内容' });
+    const file = path.join(ROOT, 'source', '_data', 'creativity.yml');
+    await backupFile(file);
+    await fsp.writeFile(file, body.content, 'utf8');
+    log('已保存创意技能（creativity.yml，已自动备份）');
+    return sendJSON(res, 200, { ok: true, message: '保存成功，已自动备份原文件' });
+  }
+
   /* ---- 自我介绍（about.yml） ---- */
   if (pathname === '/api/about' && method === 'GET') {
     const file = path.join(ROOT, 'source', '_data', 'about.yml');

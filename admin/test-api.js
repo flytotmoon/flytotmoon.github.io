@@ -138,6 +138,12 @@ async function main() {
   const essayPut = await api('/api/essay', { method: 'PUT', body: JSON.stringify({ content: essay.data.content }) });
   assert('写回千言万语（触发备份）', essayPut.status === 200);
 
+  // 相册集（album.yml）
+  const album = await api('/api/album');
+  assert('读取相册集', album.status === 200 && typeof album.data.content === 'string' && album.data.content.includes('album_list'));
+  const albumPut = await api('/api/album', { method: 'PUT', body: JSON.stringify({ content: album.data.content }) });
+  assert('写回相册集（触发备份）', albumPut.status === 200);
+
   // 媒体上传（1x1 透明 PNG）
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   const fd = new FormData();

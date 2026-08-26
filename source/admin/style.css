@@ -979,6 +979,61 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
   .essay-grid { grid-template-columns: 1fr; }
 }
 
+/* ============ 相册集 ============ */
+
+.album-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+.album-group { margin-bottom: 18px; }
+.album-group-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(211, 18, 45, 0.08), rgba(242, 185, 75, 0.10));
+  border: 1px solid var(--border);
+  border-radius: 12px 12px 0 0;
+}
+.album-cover {
+  width: 56px;
+  height: 42px;
+  border-radius: 8px;
+  background: #e8eaf2 center / cover no-repeat;
+  flex: none;
+}
+.album-group-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.album-group-meta b { font-size: 14.5px; }
+.album-group-meta > span { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.album-group-body {
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  padding: 8px 14px;
+  background: var(--card);
+}
+.album-item-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  border-bottom: 1px dashed var(--border);
+}
+.album-item-row:last-child { border-bottom: none; }
+.album-item-text { flex: 1; min-width: 0; }
+.album-item-text p { margin: 0 0 6px; line-height: 1.6; }
+.album-thumbs { display: flex; gap: 6px; align-items: center; }
+.album-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: #e8eaf2 center / cover no-repeat;
+  border: 1px solid var(--border);
+  flex: none;
+}
+
+@media screen and (max-width: 1024px) {
+  .album-grid { grid-template-columns: 1fr; }
+}
+
 /* ============ 媒体库 ============ */
 
 .dropzone {

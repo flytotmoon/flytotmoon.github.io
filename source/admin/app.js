@@ -586,6 +586,19 @@ async function githubApi(path, opts = {}) {
       return wrap({ updated });
     }
 
+    /* ---- 相册集（album.yml） ---- */
+    if (p === '/api/album' && method === 'GET') {
+      const { text } = await ghReadFile(prefix + '/_data/album.yml');
+      return wrap({ content: text });
+    }
+    if (p === '/api/album' && method === 'PUT') {
+      if (typeof body.content !== 'string') throw new Error('缺少内容');
+      const filePath = prefix + '/_data/album.yml';
+      const { sha } = await ghReadFile(filePath);
+      await ghWriteFile(filePath, body.content, sha, 'admin: 更新相册集');
+      return wrap({ message: '保存成功（Git 历史即备份，约 2~5 分钟后自动上线）' });
+    }
+
     /* ---- 千言万语（essay.yml） ---- */
     if (p === '/api/essay' && method === 'GET') {
       const { text } = await ghReadFile(prefix + '/_data/essay.yml');
@@ -924,6 +937,7 @@ const PAGE_TITLES = {
   posts: '文章管理',
   drafts: '草稿箱',
   essay: '千言万语',
+  album: '相册集',
   editor: '编辑文章',
   media: '媒体库',
   settings: '站点设置',
@@ -958,6 +972,7 @@ function route() {
     case 'posts': renderPosts(container, 'posts'); break;
     case 'drafts': renderPosts(container, 'drafts'); break;
     case 'essay': renderEssay(container); break;
+    case 'album': renderAlbum(container); break;
     case 'editor': renderEditor(container, params); break;
     case 'media': renderMedia(container); break;
     case 'settings': renderSettings(container); break;
@@ -1704,6 +1719,175 @@ async function renderEditor(container, params) {
     }
   };
   document.addEventListener('keydown', window.__editorHotkey);
+}
+
+/* ------------------------------ 相册集（album.yml） ------------------------------ */
+
+/** 轻量解析 album.yml（预览用）：返回 [{ class_name, cover, description, type, entries: [...] }] */
+function parseAlbumYaml(text) {
+  const groups = [];
+  let current = null;
+  let entry = null;
+  let arrKey = null;
+  const lines = String(text || '').split(/\r?\n/);
+
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+
+    // 分组起始：- class_name: xxx
+    const gm = /^-\s+class_name:\s*(.*)$/.exec(line);
+    if (gm) {
+      current = { class_name: cleanScalar(gm[1]), cover: '', description: '', type: '1', entries: [] };
+      groups.push(current);
+      entry = null;
+      arrKey = null;
+      continue;
+    }
+    if (!current) continue;
+
+    // 条目起始：    - date: xxx 或    - content: xxx（4 空格）
+    const em = /^\s{4}-\s+(date|content):\s*(.*)$/.exec(line);
+    if (em) {
+      entry = { date: '', content: '', address: '', from: '', link: '', image: [], video: [], aplayer: null };
+      entry[em[1]] = cleanScalar(em[2]);
+      current.entries.push(entry);
+      arrKey = null;
+      continue;
+    }
+
+    if (entry) {
+      // 8 空格：数组项（- url）或 aplayer 字段
+      const arrItem = /^\s{8}-\s+(.*)$/.exec(line);
+      if (arrItem) {
+        if (arrKey === 'image' || arrKey === 'video') entry[arrKey].push(cleanScalar(arrItem[1]));
+        continue;
+      }
+      const ap = /^\s{8}([\w-]+):\s*(.*)$/.exec(line);
+      if (ap && arrKey === 'aplayer') {
+        entry.aplayer = entry.aplayer || {};
+        entry.aplayer[ap[1]] = cleanScalar(ap[2]);
+        continue;
+      }
+      // 6 空格：条目字段
+      const ef = /^\s{6}([\w-]+):\s*(.*)$/.exec(line);
+      if (ef) {
+        const key = ef[1];
+        const val = ef[2].trim();
+        if (key === 'date' || key === 'content' || key === 'address' || key === 'from' || key === 'link') entry[key] = cleanScalar(val);
+        else if (key === 'image' || key === 'video') { arrKey = key; if (val) entry[key].push(cleanScalar(val)); }
+        else if (key === 'aplayer') { arrKey = 'aplayer'; entry.aplayer = {}; }
+        continue;
+      }
+    }
+
+    // 2 空格：分组字段
+    const gf = /^\s{2}([\w-]+):\s*(.*)$/.exec(line);
+    if (gf && gf[1] !== 'album_list') {
+      const key = gf[1];
+      current[key] = cleanScalar(gf[2]);
+    }
+  }
+  return groups;
+}
+
+async function renderAlbum(container) {
+  container.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <h3>相册集 · 每一张照片都是一次美好的记忆</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" id="album-add">＋ 新建相册</button>
+          <button class="btn btn-primary btn-sm" id="album-save">💾 保存</button>
+        </div>
+      </div>
+      <div class="card-body album-grid">
+        <div>
+          <textarea class="code-editor" id="album-editor" style="min-height:520px" spellcheck="false"></textarea>
+          <p class="hint">编辑的是 source/_data/album.yml（YAML 格式）。${MODE === 'github' ? '保存即自动触发构建，约 2~5 分钟上线。' : '保存前自动备份原文件。'}</p>
+        </div>
+        <div>
+          <div class="hint" style="margin:0 0 10px">实时预览（博客「相册集」页效果）</div>
+          <div id="album-preview"></div>
+        </div>
+      </div>
+    </div>`;
+
+  const ta = $('#album-editor');
+  const preview = $('#album-preview');
+
+  const renderPreview = () => {
+    const groups = parseAlbumYaml(ta.value);
+    if (!groups.length) {
+      preview.innerHTML = '<div class="empty-state">未解析到相册分组<br>请检查 YAML 格式</div>';
+      return;
+    }
+    preview.innerHTML = groups.map((g) => `
+      <div class="album-group">
+        <div class="album-group-head">
+          <div class="album-cover" ${g.cover ? `style="background-image:url('${esc(g.cover)}')"` : ''}></div>
+          <div class="album-group-meta">
+            <b>${esc(g.class_name || '未命名相册')}</b>
+            <span>${esc(g.description || '')}</span>
+            <span class="chip gray">${g.entries.length} 张照片 · ${g.type === '2' ? '画廊模式' : '瀑布流模式'}</span>
+          </div>
+        </div>
+        <div class="album-group-body">
+          ${g.entries.length ? g.entries.map((e) => `
+            <div class="album-item-row">
+              <div class="album-item-text">
+                <p>${esc(e.content || '（无说明）')}</p>
+                <div class="essay-item-foot">
+                  <span class="chip gray">🕐 ${esc(e.date || '无日期')}</span>
+                  ${e.address ? `<span class="chip gray">📍 ${esc(e.address)}</span>` : ''}
+                  ${e.link ? `<span class="chip blue">🔗 链接</span>` : ''}
+                </div>
+              </div>
+              <div class="album-thumbs">
+                ${(e.image || []).slice(0, 3).map((u) => `<span class="album-thumb" style="background-image:url('${esc(u)}')"></span>`).join('')}
+                ${(e.image || []).length > 3 ? `<span class="chip gray">+${e.image.length - 3}</span>` : ''}
+              </div>
+            </div>`).join('') : '<div class="empty-state">该相册暂无照片</div>'}
+        </div>
+      </div>`).join('');
+  };
+
+  ta.addEventListener('input', debounce(renderPreview, 250));
+
+  try {
+    const data = await api('/api/album');
+    ta.value = data.content || '';
+    renderPreview();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+
+  // 新建相册：文末追加模板
+  $('#album-add').addEventListener('click', () => {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    const today = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    const tpl = `\n- class_name: 新相册\n  path_name: /new-album\n  type: 1\n  description: 这里存放的是……\n  top_link: /album\n  top_btn_text: 返回\n  cover: https://封面图地址\n  album_list:\n    - date: ${today}\n      content: 照片说明\n      address: \n      image:\n        - https://图片地址\n`;
+    ta.value = ta.value.replace(/\s*$/, '') + tpl;
+    renderPreview();
+    ta.scrollTop = ta.scrollHeight;
+    toast('已在末尾添加新相册模板，替换文字与图片地址后保存即可', 'ok');
+  });
+
+  // 保存
+  $('#album-save').addEventListener('click', async () => {
+    const groups = parseAlbumYaml(ta.value);
+    if (!groups.length) {
+      const ok = await confirmModal('格式检查未通过', '没有解析到任何相册分组，确定仍要保存吗？（可能因格式错误导致博客构建失败）', true);
+      if (!ok) return;
+    }
+    try {
+      const data = await api('/api/album', { method: 'PUT', body: JSON.stringify({ content: ta.value }) });
+      toast(data.message || '保存成功', 'ok', 3200);
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  });
 }
 
 /* ------------------------------ 千言万语（essay.yml） ------------------------------ */

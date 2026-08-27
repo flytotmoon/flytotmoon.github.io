@@ -388,6 +388,8 @@ async function githubApi(path, opts = {}) {
       if (category) posts = posts.filter((pp) => pp.categories.includes(category));
       if (tag) posts = posts.filter((pp) => pp.tags.includes(tag));
       posts.sort((a, b) => {
+        // 置顶优先级高的排在前面
+        if ((b.sticky || 0) !== (a.sticky || 0)) return (b.sticky || 0) - (a.sticky || 0);
         const da = String(a.date || '');
         const db = String(b.date || '');
         if (da === db) return 0;
@@ -1261,7 +1263,7 @@ async function renderPosts(container, scope) {
         rows.innerHTML = data.posts.map((p) => `
           <tr>
             <td class="post-title-cell" title="${esc(p.title)}">
-              ${p.sticky ? '<span class="sticky-flag">📌</span>' : ''}${esc(p.title)}
+              ${p.sticky ? `<span class="sticky-flag">📌${p.sticky > 1 ? p.sticky : ''}</span>` : ''}${esc(p.title)}
             </td>
             <td class="meta-cell">${esc(String(p.date || '').slice(0, 16))}</td>
             <td class="meta-cell">${p.categories.map((c) => `<span class="chip blue">${esc(c)}</span>`).join('')}</td>
@@ -1532,8 +1534,15 @@ async function renderEditor(container, params) {
           <label class="field"><span>封面图片 URL</span><input id="ed-cover" placeholder="https://…" /></label>
           <img id="ed-cover-preview" style="display:none;width:100%;border-radius:9px;margin-top:6px" alt="封面预览" />
           <label class="field"><span>文章摘要 description</span><textarea id="ed-description" rows="3" placeholder="留空则自动截取"></textarea></label>
-          <div style="display:flex;gap:16px;flex-wrap:wrap">
-            <label class="check-row"><input type="checkbox" id="ed-sticky" /> 置顶</label>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+            <label class="field" style="margin:0;flex:1;min-width:150px"><span>置顶优先级</span>
+              <select id="ed-sticky">
+                <option value="0">不置顶</option>
+                <option value="1">置顶 · 普通</option>
+                <option value="2">置顶 · 较高</option>
+                <option value="3">置顶 · 最高</option>
+              </select>
+            </label>
             <label class="check-row"><input type="checkbox" id="ed-comments" checked /> 允许评论</label>
             <label class="check-row"><input type="checkbox" id="ed-mathjax" /> 数学公式</label>
           </div>
@@ -1672,7 +1681,7 @@ async function renderEditor(container, params) {
         $('#ed-cover-preview').style.display = 'block';
       }
       $('#ed-description').value = p.description || '';
-      $('#ed-sticky').checked = p.sticky > 0;
+      $('#ed-sticky').value = String(p.sticky || 0);
       $('#ed-comments').checked = p.comments !== false;
       $('#ed-mathjax').checked = Boolean(p.mathjax);
       ta.value = p.body || '';
@@ -1698,7 +1707,7 @@ async function renderEditor(container, params) {
       tags: EDITOR_STATE.chipsTags.get(),
       cover: $('#ed-cover').value.trim(),
       description: $('#ed-description').value.trim(),
-      sticky: $('#ed-sticky').checked ? 1 : 0,
+      sticky: parseInt($('#ed-sticky').value, 10) || 0,
       comments: $('#ed-comments').checked,
       mathjax: $('#ed-mathjax').checked,
     };

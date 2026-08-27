@@ -89,7 +89,7 @@ async function main() {
     method: 'POST',
     body: JSON.stringify({
       title: '后台测试文章', content: '## 测试\n\n这是后台创建的测试内容。', date: '2026-08-26 12:00:00',
-      categories: ['杂文'], tags: ['测试'], cover: 'https://example.com/x.jpg', sticky: 0, mathjax: false, comments: true,
+      categories: ['杂文'], tags: ['测试'], cover: 'https://example.com/x.jpg', sticky: 3, mathjax: false, comments: true,
     }),
   });
   assert('创建文章成功', created.status === 200 && created.data.key);
@@ -97,6 +97,7 @@ async function main() {
   if (cKey) {
     const got = await api('/api/posts/' + encodeURIComponent(cKey));
     assert('新文章分类正确', got.data.post.categories.join(',') === '杂文');
+    assert('置顶优先级保留（sticky=3）', got.data.post.sticky === 3);
     const renamed = await api('/api/posts/' + encodeURIComponent(cKey), {
       method: 'PUT',
       body: JSON.stringify({ scope: 'posts', title: '后台测试文章-改', content: got.data.post.body + '\n\n追加一行', tags: ['测试', '改'] }),

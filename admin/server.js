@@ -697,6 +697,8 @@ async function handleApi(req, res, urlObj, user) {
     if (category) posts = posts.filter((p) => p.categories.includes(category));
     if (tag) posts = posts.filter((p) => p.tags.includes(tag));
     posts.sort((a, b) => {
+      // 置顶优先级高的排在前面
+      if ((b.sticky || 0) !== (a.sticky || 0)) return (b.sticky || 0) - (a.sticky || 0);
       const da = a.date ? String(a.date) : '';
       const db = b.date ? String(b.date) : '';
       if (da !== db) return da < db ? 1 : -1;

@@ -354,47 +354,102 @@ body {
   }
 }
 
-/* ---------- 「飞向月球」艺术标题（毛笔书法 + 金色流光） ---------- */
+/* ---------- 「飞向月球」标题（云游君小站式竖排逐字） ---------- */
+/* 仅首页生效：由 custom.js 将标题拆分为竖向字符，衬线字重 900 + 随机字号 + 白底块 + 竖线展开动画 */
 
-#site-title {
-  font-weight: 400;
-  letter-spacing: 0.16em;
+#site-title.yun-banner {
+  background-image: none !important;
+  background-clip: initial;
+  -webkit-text-fill-color: initial;
+  color: #fff;
+  filter: none;
+  animation: none;
   text-shadow: none;
-  background-image: linear-gradient(
-    100deg,
-    #ffefb3 0%,
-    #f7d774 20%,
-    #f2b94b 40%,
-    #ea8f3c 58%,
-    #e05a2a 74%,
-    #d3122d 92%,
-    #f2b94b 100%
-  );
-  background-size: 220% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  filter: drop-shadow(0 2px 12px rgba(255, 200, 90, 0.35));
-  animation: ftm-title-shine 7s ease-in-out infinite;
+  letter-spacing: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.4rem 0;
 }
 
-@keyframes ftm-title-shine {
-  0% { background-position: 0% center; }
-  50% { background-position: 100% center; }
-  100% { background-position: 0% center; }
+.yun-line {
+  width: 1px;
+  height: 0;
+  background: var(--yun-line-color, #d3122d);
 }
 
-[data-theme="dark"] #site-title {
-  background-image: linear-gradient(
-    100deg,
-    #fff3c9 0%,
-    #f7d774 25%,
-    #f2b94b 50%,
-    #e8833a 75%,
-    #f2b94b 100%
-  );
-  filter: drop-shadow(0 2px 14px rgba(242, 185, 75, 0.5));
+.yun-line.yun-anim {
+  animation: yun-extend-line 0.45s ease-in forwards;
+}
+
+@keyframes yun-extend-line {
+  from { height: 0; }
+  to { height: var(--yun-line-h, 0px); }
+}
+
+.yun-char-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 0;
+}
+
+.yun-char-box {
+  display: flex;
+  opacity: 0;
+}
+
+.yun-char-left {
+  border-left: 1px solid var(--yun-line-color, #d3122d);
+  border-right: 0 solid var(--yun-line-color, #d3122d);
+  animation: yun-char-move-left 0.5s ease-out 0.35s forwards;
+}
+
+.yun-char-right {
+  border-right: 1px solid var(--yun-line-color, #d3122d);
+  border-left: 0 solid var(--yun-line-color, #d3122d);
+  animation: yun-char-move-right 0.5s ease-out 0.35s forwards;
+}
+
+@keyframes yun-char-move-left {
+  from { opacity: 0; border-right-width: 0; }
+  to { opacity: 1; border-right-width: var(--yun-char-size, 2rem); }
+}
+
+@keyframes yun-char-move-right {
+  from { opacity: 0; border-left-width: 0; }
+  to { opacity: 1; border-left-width: var(--yun-char-size, 2rem); }
+}
+
+.yun-char {
+  font-family: "Noto Serif SC", "Songti SC", STZhongsong, STKaiti, KaiTi, serif;
+  font-size: var(--yun-char-size, 2rem);
+  font-weight: 900;
+  line-height: 1.15;
+  padding: 0.14em 0.32em;
+  color: #1b1b1f;
+  background: rgba(255, 255, 255, 0.55);
+  transition: color 0.3s ease, background-color 0.3s ease;
+}
+
+.yun-char:hover {
+  color: #fff;
+  background: #1b1b1f;
+}
+
+[data-theme="dark"] .yun-char {
+  color: #f5f5f7;
+  background: rgba(28, 28, 38, 0.5);
+}
+
+[data-theme="dark"] .yun-char:hover {
+  color: #1b1b1f;
+  background: #f5f5f7;
+}
+
+[data-theme="dark"] #site-title.yun-banner {
+  --yun-line-color: #f2b94b;
 }
 
 /* 顶部导航站名：书法字 + 悬停金光 */
@@ -408,9 +463,11 @@ body {
   text-shadow: 0 0 16px rgba(242, 185, 75, 0.75);
 }
 
-/* 移动端减小字距，避免书法字溢出 */
+/* 移动端：缩小字符与字距 */
 @media screen and (max-width: 768px) {
-  #site-title { letter-spacing: 0.08em; }
+  #site-title.yun-banner { padding: 0.2rem 0; }
+  .yun-char-container { gap: 0.26rem; padding: 0.4rem 0; }
+  .yun-char { padding: 0.1em 0.26em; }
   #site-name { letter-spacing: 0.06em; }
 }
 

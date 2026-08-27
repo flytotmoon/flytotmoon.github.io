@@ -105,12 +105,66 @@
     navRight.insertBefore(btn, toggle);
   }
 
+  /* 「飞向月球」标题：云游君小站式竖排逐字动画（仅首页生效）
+     - 竖排 + 衬线字重 900 + 随机字号 + 半透明白底
+     - 上下竖线展开 → 每个字交替左右滑入 */
+  function initYunTitle() {
+    var isHome = location.pathname === "/" || location.pathname === "/index.html";
+    if (!isHome) return;
+    var title = document.getElementById("site-title");
+    if (!title || title.dataset.yunDone) return;
+    var text = title.textContent.trim();
+    if (text !== "飞向月球") return;
+
+    title.dataset.yunDone = "1";
+    title.classList.add("yun-banner");
+    title.textContent = "";
+
+    var lineTop = document.createElement("div");
+    lineTop.className = "yun-line";
+    var lineBottom = document.createElement("div");
+    lineBottom.className = "yun-line";
+    var container = document.createElement("div");
+    container.className = "yun-char-container";
+
+    var chars = text.split("");
+    var sumH = 0;
+    var isMobile = window.innerWidth < 768;
+    chars.forEach(function (ch, i) {
+      var box = document.createElement("div");
+      // 随机字号：移动端 1.35~2.45rem，桌面 1.75~3.3rem（还原云游君 banner 的随机感）
+      var rn = isMobile ? 1.35 + Math.random() * 1.1 : 1.75 + Math.random() * 1.55;
+      box.className = "yun-char-box " + (i % 2 === 0 ? "yun-char-left" : "yun-char-right");
+      box.style.setProperty("--yun-char-size", rn.toFixed(2) + "rem");
+      var span = document.createElement("span");
+      span.className = "yun-char";
+      span.textContent = ch;
+      box.appendChild(span);
+      container.appendChild(box);
+      sumH += rn;
+    });
+
+    title.appendChild(lineTop);
+    title.appendChild(container);
+    title.appendChild(lineBottom);
+
+    // 上下竖线高度：各填充到 50vh
+    title.style.setProperty("--yun-line-h", "calc(50vh - " + (sumH / 2).toFixed(2) + "rem)");
+
+    // 延迟一帧触发入场动画
+    requestAnimationFrame(function () {
+      lineTop.classList.add("yun-anim");
+      lineBottom.classList.add("yun-anim");
+    });
+  }
+
   function initCustom() {
     wrapTables();
     bindImageFallback();
     bindExternalLinks();
     bindAnchorSmooth();
     addAdminButton();
+    initYunTitle();
   }
 
   if (document.readyState === "loading") {

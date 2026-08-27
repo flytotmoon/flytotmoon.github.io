@@ -369,7 +369,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0.4rem 0;
+  padding: 0.2rem 0;
+  /* 上下竖线高度：适中固定值，避免撑破 hero 布局 */
+  --yun-line-h: 2.6rem;
 }
 
 .yun-line {
@@ -384,15 +386,15 @@ body {
 
 @keyframes yun-extend-line {
   from { height: 0; }
-  to { height: var(--yun-line-h, 0px); }
+  to { height: var(--yun-line-h, 2.6rem); }
 }
 
 .yun-char-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.7rem 0;
+  gap: 0.3rem;
+  padding: 0.5rem 0;
 }
 
 .yun-char-box {
@@ -465,9 +467,9 @@ body {
 
 /* 移动端：缩小字符与字距 */
 @media screen and (max-width: 768px) {
-  #site-title.yun-banner { padding: 0.2rem 0; }
-  .yun-char-container { gap: 0.26rem; padding: 0.4rem 0; }
-  .yun-char { padding: 0.1em 0.26em; }
+  #site-title.yun-banner { padding: 0.1rem 0; --yun-line-h: 1.6rem; }
+  .yun-char-container { gap: 0.22rem; padding: 0.3rem 0; }
+  .yun-char { padding: 0.1em 0.24em; }
   #site-name { letter-spacing: 0.06em; }
 }
 

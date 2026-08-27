@@ -131,8 +131,8 @@
     var isMobile = window.innerWidth < 768;
     chars.forEach(function (ch, i) {
       var box = document.createElement("div");
-      // 随机字号：移动端 1.1~1.8rem，桌面 1.45~2.35rem（适配 AnZhiYu hero 高度）
-      var rn = isMobile ? 1.1 + Math.random() * 0.7 : 1.45 + Math.random() * 0.9;
+      // 随机字号：移动端 1.35~2.2rem，桌面 1.85~3.1rem（适配 AnZhiYu hero 高度）
+      var rn = isMobile ? 1.35 + Math.random() * 0.85 : 1.85 + Math.random() * 1.25;
       box.className = "yun-char-box " + (i % 2 === 0 ? "yun-char-left" : "yun-char-right");
       box.style.setProperty("--yun-char-size", rn.toFixed(2) + "rem");
       var span = document.createElement("span");

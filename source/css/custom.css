@@ -498,6 +498,19 @@ body {
   margin-top: 6px;
 }
 
+/* 条形内元信息改为文档流（主题默认绝对定位悬浮，压缩高度后会与文字重叠） */
+#recent-posts > .recent-post-item.ftm-sticky-bar > .recent-post-info > .article-meta-wrap {
+  position: static;
+  bottom: auto;
+  left: auto;
+  margin-top: 6px;
+}
+
+/* 条形中标题一行显示，整体更紧凑 */
+#recent-posts > .recent-post-item.ftm-sticky-bar > .recent-post-info .article-title {
+  -webkit-line-clamp: 1;
+}
+
 /* 条形中显示一行摘要 */
 #content-inner #recent-posts > .recent-post-item.ftm-sticky-bar > .recent-post-info > .content {
   display: -webkit-box !important;

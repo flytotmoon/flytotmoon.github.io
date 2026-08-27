@@ -506,20 +506,9 @@ body {
   margin-top: 6px;
 }
 
-/* 条形中标题一行显示，整体更紧凑 */
+/* 条形中标题一行显示，整体更紧凑（不显示内容预览） */
 #recent-posts > .recent-post-item.ftm-sticky-bar > .recent-post-info .article-title {
   -webkit-line-clamp: 1;
-}
-
-/* 条形中显示一行摘要 */
-#content-inner #recent-posts > .recent-post-item.ftm-sticky-bar > .recent-post-info > .content {
-  display: -webkit-box !important;
-  opacity: 1 !important;
-  height: auto !important;
-  -webkit-line-clamp: 1;
-  font-size: 0.85rem;
-  color: var(--anzhiyu-secondtext);
-  margin-top: 4px;
 }
 
 /* 桌面双列模式下：置顶文章跨两列通栏、横向排列 */

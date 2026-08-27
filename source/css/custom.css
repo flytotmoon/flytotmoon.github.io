@@ -473,6 +473,63 @@ body {
   #site-name { letter-spacing: 0.06em; }
 }
 
+/* ---------- 首页置顶文章：通栏条形排列 ---------- */
+
+#recent-posts > .recent-post-item.ftm-sticky-bar {
+  box-shadow: inset 3px 0 0 var(--anzhiyu-main);
+  height: 9rem !important;
+}
+
+#recent-posts > .recent-post-item.ftm-sticky-bar .post_cover {
+  width: 10rem !important;
+  height: 100% !important;
+  flex: none;
+}
+
+#recent-posts > .recent-post-item.ftm-sticky-bar > .recent-post-info {
+  height: auto !important;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#recent-posts > .recent-post-item.ftm-sticky-bar .recent-post-info-top-tips {
+  margin-top: 6px;
+}
+
+/* 条形中显示一行摘要 */
+#content-inner #recent-posts > .recent-post-item.ftm-sticky-bar > .recent-post-info > .content {
+  display: -webkit-box !important;
+  opacity: 1 !important;
+  height: auto !important;
+  -webkit-line-clamp: 1;
+  font-size: 0.85rem;
+  color: var(--anzhiyu-secondtext);
+  margin-top: 4px;
+}
+
+/* 桌面双列模式下：置顶文章跨两列通栏、横向排列 */
+@media screen and (min-width: 1201px) {
+  #recent-posts > .recent-post-item.ftm-sticky-bar {
+    width: 100% !important;
+    flex-direction: row !important;
+    align-items: stretch;
+  }
+}
+
+/* 移动端：小封面条形 */
+@media screen and (max-width: 768px) {
+  #recent-posts > .recent-post-item.ftm-sticky-bar {
+    height: auto !important;
+    flex-direction: row !important;
+  }
+  #recent-posts > .recent-post-item.ftm-sticky-bar .post_cover {
+    width: 6.5rem !important;
+    height: 6.5rem !important;
+  }
+}
+
 /* ---------- 导航栏右上角「管理后台」入口按钮 ---------- */
 
 .ftm-admin-btn a {

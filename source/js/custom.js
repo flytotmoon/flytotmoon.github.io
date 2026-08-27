@@ -153,6 +153,18 @@
     });
   }
 
+  /* 首页置顶文章标记为通栏条形（配合 custom.css 的 .ftm-sticky-bar 样式） */
+  function initStickyBars() {
+    var list = document.getElementById("recent-posts");
+    if (!list) return;
+    var items = list.querySelectorAll(".recent-post-item");
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      if (item.classList.contains("ftm-sticky-bar")) continue;
+      if (item.querySelector(".sticky-warp")) item.classList.add("ftm-sticky-bar");
+    }
+  }
+
   function initCustom() {
     wrapTables();
     bindImageFallback();
@@ -160,6 +172,7 @@
     bindAnchorSmooth();
     addAdminButton();
     initYunTitle();
+    initStickyBars();
   }
 
   if (document.readyState === "loading") {

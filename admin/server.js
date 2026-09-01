@@ -520,6 +520,20 @@ async function backupFile(file) {
   }
 }
 
+/** 将 image/video 的标量写法规范为主题期望的列表写法（防止图片不显示） */
+function normalizeImageFields(content) {
+  return String(content || '')
+    .split(/\r?\n/)
+    .map((line) => {
+      const m = /^(\s{6})(image|video):\s*(\S+)\s*$/.exec(line);
+      if (m && m[3]) {
+        return `${m[1]}${m[2]}:\n${m[1]}  - ${m[3]}`;
+      }
+      return line;
+    })
+    .join('\n');
+}
+
 /** 为 album.yml 中缺少详情页的相册自动创建页面（type: album_detail） */
 async function ensureAlbumPages(content) {
   const created = [];
@@ -1032,11 +1046,12 @@ async function handleApi(req, res, urlObj, user) {
   if (pathname === '/api/album' && method === 'PUT') {
     const body = await readJSON(req);
     if (typeof body.content !== 'string') return sendJSON(res, 400, { ok: false, message: '缺少内容' });
+    const content = normalizeImageFields(body.content);
     const file = path.join(ROOT, 'source', '_data', 'album.yml');
     await backupFile(file);
-    await fsp.writeFile(file, body.content, 'utf8');
+    await fsp.writeFile(file, content, 'utf8');
     // 自动为缺少详情页的相册创建页面（避免点击相册卡片 404）
-    const createdPages = await ensureAlbumPages(body.content);
+    const createdPages = await ensureAlbumPages(content);
     log('已保存相册集（album.yml，已自动备份）' + (createdPages.length ? '，自动创建页面：' + createdPages.join(', ') : ''));
     return sendJSON(res, 200, { ok: true, message: '保存成功，已自动备份原文件', createdPages });
   }
@@ -1050,9 +1065,10 @@ async function handleApi(req, res, urlObj, user) {
   if (pathname === '/api/essay' && method === 'PUT') {
     const body = await readJSON(req);
     if (typeof body.content !== 'string') return sendJSON(res, 400, { ok: false, message: '缺少内容' });
+    const content = normalizeImageFields(body.content);
     const file = path.join(ROOT, 'source', '_data', 'essay.yml');
     await backupFile(file);
-    await fsp.writeFile(file, body.content, 'utf8');
+    await fsp.writeFile(file, content, 'utf8');
     log('已保存千言万语（essay.yml，已自动备份）');
     return sendJSON(res, 200, { ok: true, message: '保存成功，已自动备份原文件' });
   }

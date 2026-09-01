@@ -626,15 +626,16 @@ async function githubApi(path, opts = {}) {
     }
     if (p === '/api/album' && method === 'PUT') {
       if (typeof body.content !== 'string') throw new Error('缺少内容');
+      const content = normalizeImageFields(body.content);
       const filePath = prefix + '/_data/album.yml';
       const { sha } = await ghReadFile(filePath);
-      await ghWriteFile(filePath, body.content, sha, 'admin: 更新相册集');
+      await ghWriteFile(filePath, content, sha, 'admin: 更新相册集');
       // 自动为缺少详情页的相册创建页面（避免点击相册卡片 404）
       const tree = await ghTree(true);
       const existing = new Set((tree.tree || []).map((e) => e.path));
       const createdPages = [];
       let className = '';
-      for (const raw of String(body.content).split(/\r?\n/)) {
+      for (const raw of String(content).split(/\r?\n/)) {
         const line = raw.replace(/\s+$/, '');
         const cm = /^-\s+class_name:\s*(.*)$/.exec(line);
         if (cm) {
@@ -666,9 +667,10 @@ async function githubApi(path, opts = {}) {
     }
     if (p === '/api/essay' && method === 'PUT') {
       if (typeof body.content !== 'string') throw new Error('缺少内容');
+      const content = normalizeImageFields(body.content);
       const filePath = prefix + '/_data/essay.yml';
       const { sha } = await ghReadFile(filePath);
-      await ghWriteFile(filePath, body.content, sha, 'admin: 更新千言万语');
+      await ghWriteFile(filePath, content, sha, 'admin: 更新千言万语');
       return wrap({ message: '保存成功（Git 历史即备份，约 2~5 分钟后自动上线）' });
     }
 
@@ -2392,6 +2394,20 @@ function yamlHasBadIndent(text) {
   return String(text || '').split(/\r?\n/).some((l) => /^ [^ ]/.test(l));
 }
 
+/** 将 image/video 的标量写法规范为主题期望的列表写法（防止图片不显示） */
+function normalizeImageFields(text) {
+  return String(text || '')
+    .split(/\r?\n/)
+    .map((line) => {
+      const m = /^(\s{6})(image|video):\s*(\S+)\s*$/.exec(line);
+      if (m && m[3]) {
+        return `${m[1]}${m[2]}:\n${m[1]}  - ${m[3]}`;
+      }
+      return line;
+    })
+    .join('\n');
+}
+
 /** 轻量解析 essay.yml（预览用）：返回 [{ title, subTitle, tips, limit, entries: [...] }] */
 function parseEssayYaml(text) {
   const groups = [];
@@ -2531,7 +2547,7 @@ async function renderEssay(container) {
     const d = new Date();
     const p = (n) => String(n).padStart(2, '0');
     const today = `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())}`;
-    const tpl = `\n    - content: 写点什么吧…\n      date: ${today}\n`;
+    const tpl = `\n    - content: 写点什么吧…\n      date: ${today}\n      # image:\n      #   - https://图片地址（图片请用列表格式，一行一个）\n`;
     ta.value = ta.value.replace(/\s*$/, '') + tpl;
     renderPreview();
     ta.scrollTop = ta.scrollHeight;

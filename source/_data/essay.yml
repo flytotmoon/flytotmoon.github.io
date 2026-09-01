@@ -7,6 +7,11 @@
   home_essay: true
   top_background: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/CC4B6E24C241768D31C88C8ABEC81E6E.jpg
   essay_list:
+    - content: 夕阳无限好，只是近黄昏。
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/e657eb7f5a3c7802fecde5bc9f124dbe.jpg
+      date: 2026/09/01
+
     - content: 出公告了，但是感觉之前还是有点懒散了，这几天努力努力吧！
       date: 2026/05/27
    
@@ -22,3 +27,4 @@
       date: 2026/08/26
     - content: 今天写写文章
       date: 2026/08/30
+  

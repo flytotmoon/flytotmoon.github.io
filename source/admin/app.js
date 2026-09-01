@@ -629,7 +629,34 @@ async function githubApi(path, opts = {}) {
       const filePath = prefix + '/_data/album.yml';
       const { sha } = await ghReadFile(filePath);
       await ghWriteFile(filePath, body.content, sha, 'admin: 更新相册集');
-      return wrap({ message: '保存成功（Git 历史即备份，约 2~5 分钟后自动上线）' });
+      // 自动为缺少详情页的相册创建页面（避免点击相册卡片 404）
+      const tree = await ghTree(true);
+      const existing = new Set((tree.tree || []).map((e) => e.path));
+      const createdPages = [];
+      let className = '';
+      for (const raw of String(body.content).split(/\r?\n/)) {
+        const line = raw.replace(/\s+$/, '');
+        const cm = /^-\s+class_name:\s*(.*)$/.exec(line);
+        if (cm) {
+          className = cm[1].trim();
+          continue;
+        }
+        const pm = /^\s{2}path_name:\s*(\/\S+)\s*$/.exec(line);
+        if (pm && pm[1] && pm[1] !== '/') {
+          const dir = pm[1].replace(/^\/+|\/+$/g, '');
+          if (!dir || dir.includes('..')) continue;
+          const pagePath = prefix + '/' + dir + '/index.md';
+          if (existing.has(pagePath)) continue;
+          const fm = `---\ntitle: ${className || dir}\ndate: ${nowLocalStr()}\naside: false\ntop_img: false\ntype: "album_detail"\n---\n`;
+          await ghWriteFile(pagePath, fm, null, `admin: 自动创建相册页面 ${pm[1]}`);
+          existing.add(pagePath);
+          createdPages.push(pm[1]);
+        }
+      }
+      return wrap({
+        message: '保存成功（Git 历史即备份，约 2~5 分钟后自动上线）',
+        createdPages,
+      });
     }
 
     /* ---- 千言万语（essay.yml） ---- */
@@ -1933,7 +1960,7 @@ async function renderDataYamlPage(container, cfg) {
 
   $('#data-save').addEventListener('click', async () => {
     if (cfg.validate && !cfg.validate(ta.value)) {
-      const ok = await confirmModal('格式检查未通过', '没有解析到任何内容，确定仍要保存吗？（可能因格式错误导致博客构建失败）', true);
+      const ok = await confirmModal('格式检查未通过', 'YAML 缩进似乎有误或没有解析到任何内容，确定仍要保存吗？（缩进错误会导致博客构建失败）', true);
       if (!ok) return;
     }
     try {
@@ -1952,7 +1979,7 @@ function renderFlink(container) {
     addLabel: '新建分组',
     hint: `编辑的是 source/_data/link.yml（YAML 格式）。支持 flink_style: flexcard / telescopic / anzhiyu 三种样式。${MODE === 'github' ? '保存即自动触发构建，约 2~5 分钟上线。' : '保存前自动备份原文件。'}`,
     addTemplate: () => '\n- class_name: 新分组\n  flink_style: anzhiyu\n  link_list:\n    - name: 站点名\n      link: https://\n      avatar: https://头像地址\n      descr: 站点描述\n      recommend: true\n',
-    validate: (v) => parseLinkYaml(v).length > 0,
+    validate: (v) => !yamlHasBadIndent(v) && parseLinkYaml(v).length > 0,
     render: (preview, text) => {
       const groups = parseLinkYaml(text);
       if (!groups.length) {
@@ -1994,7 +2021,7 @@ function renderEquipment(container) {
     addLabel: '新建分类',
     hint: `编辑的是 source/_data/equipment.yml（YAML 格式）。分组下可有多个 good_things 分类，每个分类下是 equipment_list。${MODE === 'github' ? '保存即自动触发构建，约 2~5 分钟上线。' : '保存前自动备份原文件。'}`,
     addTemplate: () => '\n- class_name: 新分类\n  description: 装备推荐\n  tip: \n  good_things:\n    - title: 生产力\n      description: \n      equipment_list:\n        - name: 设备名\n          specification: \n          description: \n          image: https://图片地址\n          link: https://\n',
-    validate: (v) => parseEquipmentYaml(v).length > 0,
+    validate: (v) => !yamlHasBadIndent(v) && parseEquipmentYaml(v).length > 0,
     render: (preview, text) => {
       const groups = parseEquipmentYaml(text);
       if (!groups.length) {
@@ -2034,7 +2061,7 @@ function renderCreativity(container) {
     addLabel: '新建分组',
     hint: `编辑的是 source/_data/creativity.yml（YAML 格式）。每项为 name + icon（图标地址）。${MODE === 'github' ? '保存即自动触发构建，约 2~5 分钟上线。' : '保存前自动备份原文件。'}`,
     addTemplate: () => '\n- class_name: 新分组\n  creativity_list:\n    - name: 名字\n      icon: https://图标地址\n',
-    validate: (v) => parseCreativityYaml(v).length > 0,
+    validate: (v) => !yamlHasBadIndent(v) && parseCreativityYaml(v).length > 0,
     render: (preview, text) => {
       const groups = parseCreativityYaml(text);
       if (!groups.length) {
@@ -2164,8 +2191,8 @@ async function renderAbout(container) {
 
   $('#about-save').addEventListener('click', async () => {
     const info = parseAboutYaml(ta.value);
-    if (!info.sections.length) {
-      const ok = await confirmModal('格式检查未通过', '没有解析到任何内容，确定仍要保存吗？（可能因格式错误导致博客构建失败）', true);
+    if (yamlHasBadIndent(ta.value) || !info.sections.length) {
+      const ok = await confirmModal('格式检查未通过', 'YAML 缩进似乎有误或没有解析到任何内容，确定仍要保存吗？（缩进错误会导致博客构建失败）', true);
       if (!ok) return;
     }
     try {
@@ -2333,13 +2360,16 @@ async function renderAlbum(container) {
   // 保存
   $('#album-save').addEventListener('click', async () => {
     const groups = parseAlbumYaml(ta.value);
-    if (!groups.length) {
-      const ok = await confirmModal('格式检查未通过', '没有解析到任何相册分组，确定仍要保存吗？（可能因格式错误导致博客构建失败）', true);
+    if (yamlHasBadIndent(ta.value) || !groups.length) {
+      const ok = await confirmModal('格式检查未通过', 'YAML 缩进似乎有误或没有解析到任何相册分组，确定仍要保存吗？（缩进错误会导致博客构建失败）', true);
       if (!ok) return;
     }
     try {
       const data = await api('/api/album', { method: 'PUT', body: JSON.stringify({ content: ta.value }) });
-      toast(data.message || '保存成功', 'ok', 3200);
+      const extra = (data.createdPages && data.createdPages.length)
+        ? '，已自动创建相册页面：' + data.createdPages.join('、')
+        : '';
+      toast((data.message || '保存成功') + extra, 'ok', 4200);
     } catch (e) {
       toast(e.message, 'error');
     }
@@ -2355,6 +2385,11 @@ function cleanScalar(v) {
     s = s.slice(1, -1);
   }
   return s;
+}
+
+/** 检测明显缩进错误：行首恰好 1 个空格（常见于手工修改 YAML 时） */
+function yamlHasBadIndent(text) {
+  return String(text || '').split(/\r?\n/).some((l) => /^ [^ ]/.test(l));
 }
 
 /** 轻量解析 essay.yml（预览用）：返回 [{ title, subTitle, tips, limit, entries: [...] }] */
@@ -2506,8 +2541,8 @@ async function renderEssay(container) {
   // 保存
   $('#essay-save').addEventListener('click', async () => {
     const groups = parseEssayYaml(ta.value);
-    if (!groups.length) {
-      const ok = await confirmModal('格式检查未通过', '没有解析到任何条目，确定仍要保存吗？（可能因格式错误导致博客构建失败）', true);
+    if (yamlHasBadIndent(ta.value) || !groups.length) {
+      const ok = await confirmModal('格式检查未通过', 'YAML 缩进似乎有误或没有解析到任何条目，确定仍要保存吗？（缩进错误会导致博客构建失败）', true);
       if (!ok) return;
     }
     try {

@@ -520,6 +520,36 @@ async function backupFile(file) {
   }
 }
 
+/** 为 album.yml 中缺少详情页的相册自动创建页面（type: album_detail） */
+async function ensureAlbumPages(content) {
+  const created = [];
+  const lines = String(content || '').split(/\r?\n/);
+  let className = '';
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    const cm = /^-\s+class_name:\s*(.*)$/.exec(line);
+    if (cm) {
+      className = cm[1].trim();
+      continue;
+    }
+    const pm = /^\s{2}path_name:\s*(\/\S+)\s*$/.exec(line);
+    if (pm && pm[1] && pm[1] !== '/') {
+      const dir = pm[1].replace(/^\/+|\/+$/g, '');
+      if (!dir || dir.includes('..')) continue;
+      const pageFile = path.join(ROOT, 'source', dir, 'index.md');
+      try {
+        await fsp.access(pageFile);
+      } catch (e) {
+        const fm = `---\ntitle: ${className || dir}\ndate: ${nowLocal()}\naside: false\ntop_img: false\ntype: "album_detail"\n---\n`;
+        await fsp.mkdir(path.dirname(pageFile), { recursive: true });
+        await fsp.writeFile(pageFile, fm, 'utf8');
+        created.push(pm[1]);
+      }
+    }
+  }
+  return created;
+}
+
 const CONFIG_FILE_WHITELIST = ['_config.yml', '_config.anzhiyu.yml'];
 
 /* ------------------------------ HTTP 辅助 ------------------------------ */
@@ -1005,8 +1035,10 @@ async function handleApi(req, res, urlObj, user) {
     const file = path.join(ROOT, 'source', '_data', 'album.yml');
     await backupFile(file);
     await fsp.writeFile(file, body.content, 'utf8');
-    log('已保存相册集（album.yml，已自动备份）');
-    return sendJSON(res, 200, { ok: true, message: '保存成功，已自动备份原文件' });
+    // 自动为缺少详情页的相册创建页面（避免点击相册卡片 404）
+    const createdPages = await ensureAlbumPages(body.content);
+    log('已保存相册集（album.yml，已自动备份）' + (createdPages.length ? '，自动创建页面：' + createdPages.join(', ') : ''));
+    return sendJSON(res, 200, { ok: true, message: '保存成功，已自动备份原文件', createdPages });
   }
 
   /* ---- 千言万语（essay.yml） ---- */

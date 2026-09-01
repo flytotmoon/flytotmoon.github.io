@@ -50,10 +50,71 @@
   description: 这里存放的是我在银川生活的点点滴滴
   top_link: /album
   top_btn_text: 返回
-  cover: https://封面图地址
+  cover: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/5db262f97660dac6b7fee3fcc614e91a.jpg
   album_list:
     - date: 2026-09-01
-      content: 照片说明
+      content: 
       address: 
       image:
-        - https://图片地址
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/5db262f97660dac6b7fee3fcc614e91a.jpg
+ album_list:
+    - date: 2026-09-01
+      content: 
+      address: 
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/75bb4816c01dca49ed290883ff1beda2.jpg
+ album_list:
+    - date: 2026-09-01
+      content: 
+      address: 
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/8b871922e6a286600d251a2ecd679934.jpg
+ album_list:
+    - date: 2026-09-01
+      content: 
+      address: 
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/77cab2abe4cf3f55fc79444732899c20.jpg
+ album_list:
+    - date: 2026-09-01
+      content: 
+      address: 
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/aa6a37c776cea85502d9aab99a2a0f38.jpg
+ album_list:
+    - date: 2026-09-01
+      content: 
+      address: 
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/415f3201baf190bd8df60fbbba0bba10.jpg
+ album_list:
+    - date: 2026-09-01
+      content: 
+      address: 
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/d2299bd3ca2f8adee6c3522c3ce498f0.jpg
+ album_list:
+    - date: 2026-09-01
+      content: 
+      address: 
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/4174ccc5d9a2e00bcf078ecafb07fe08.jpg
+ album_list:
+    - date: 2026-09-01
+      content: 
+      address: 
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/fcba7b65f7f593c457be31b3afd1ae2d.jpg
+ album_list:
+    - date: 2026-09-01
+      content: 
+      address: 
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/3432103f701d416e3887de678b528cf0.jpg
+ album_list:
+    - date: 2026-09-01
+      content: 
+      address: 
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/6fa1a2e742d428448276aeac62aba4ff.jpg
+

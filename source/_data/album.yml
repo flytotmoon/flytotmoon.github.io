@@ -1,7 +1,7 @@
 
 - class_name: 北京之旅
   path_name: /beijing-trip
-  type: 1
+  type: 2
   description: 这里存放的是有关我在北京游玩的点滴记录。
   top_link: /album
   top_btn_text: 返回
@@ -43,3 +43,17 @@
       address: 北京
       image:
         - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/416ae33d814e84e2af8b47eacdf71767.jpg
+
+- class_name: 银川的回忆
+  path_name: /yinchuan-moment
+  type: 1
+  description: 这里存放的是我在银川生活的点点滴滴
+  top_link: /album
+  top_btn_text: 返回
+  cover: https://封面图地址
+  album_list:
+    - date: 2026-09-01
+      content: 照片说明
+      address: 
+      image:
+        - https://图片地址

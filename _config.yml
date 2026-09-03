@@ -31,6 +31,8 @@ i18n_dir: :lang
 skip_render:
   # 后台管理系统前端：跳过 hexo 渲染（否则会被当作页面套上主题布局）
   - 'admin/**'
+  # Google Search Console 验证文件：必须原样发布（不能被主题布局包裹）
+  - 'google2e3599778d0b3ead.html'
 
 # Writing
 new_post_name: :title.md # File name of new posts

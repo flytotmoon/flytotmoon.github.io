@@ -7,6 +7,16 @@
   home_essay: true
   top_background: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/CC4B6E24C241768D31C88C8ABEC81E6E.jpg
   essay_list:
+    - content: 今天去了花博园玩。
+      date: 2026/09/02
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/39ff74fee1c199723135688108c74b58.jpg
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/d9fad3cb7e37a2a074c78ac03c74a65b.jpg
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/d74081d50a4194d8e8ea9deca0781d37.jpg
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/deaba5870b5aa43d0f2e3c72ce2b3790.jpg
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/f7c078d803d98e325433a3179d7f2bcd.jpg
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/b7e722e2024067f3e015e28ed44fcee0.jpg
+
     - content: 夕阳无限好，只是近黄昏。
       image:
         - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/e657eb7f5a3c7802fecde5bc9f124dbe.jpg
@@ -27,4 +37,4 @@
       date: 2026/08/26
     - content: 今天写写文章
       date: 2026/08/30
-  
+ 

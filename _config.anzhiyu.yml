@@ -1,4 +1,4 @@
-﻿menu:
+menu:
    文章:
      隧道: /archives/ || anzhiyu-icon-box-archive
      分类: /categories/ || anzhiyu-icon-shapes
@@ -654,10 +654,9 @@ google_adsense:
 #   post:
 
 # Verification (站长验证)
-# 请将 xxx 替换为你在各站长平台拿到的真实验证码，再取消对应注释
 site_verification:
-  # - name: google-site-verification
-  #   content: xxx
+  - name: google-site-verification
+    content: Kvz1tduLpNixR3AvvR0tUGUZcwwJQxSpZx3qZYMBH8g
   # - name: baidu-site-verification
   #   content: code-xxx
   # - name: msvalidate.01

@@ -33,6 +33,8 @@ skip_render:
   - 'admin/**'
   # Google Search Console 验证文件：必须原样发布（不能被主题布局包裹）
   - 'google2e3599778d0b3ead.html'
+  # Bing Webmaster 验证文件：必须原样发布
+  - 'BingSiteAuth.xml'
 
 # Writing
 new_post_name: :title.md # File name of new posts

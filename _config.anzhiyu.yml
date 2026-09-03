@@ -657,10 +657,10 @@ google_adsense:
 site_verification:
   - name: google-site-verification
     content: Kvz1tduLpNixR3AvvR0tUGUZcwwJQxSpZx3qZYMBH8g
+  - name: msvalidate.01
+    content: 30E9C297A63F8E17184E51D7DC64BAB7
   # - name: baidu-site-verification
   #   content: code-xxx
-  # - name: msvalidate.01
-  #   content: xxx
 
 # Beautify/Effect (美化/效果)
 # --------------------------------------

@@ -27,6 +27,9 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      BAIDU_TOKEN: ${{ secrets.BAIDU_TOKEN }}
+      INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
     steps:
       - name: 检出源码
         uses: actions/checkout@v4
@@ -68,3 +71,21 @@ jobs:
           force_orphan: true
           commit_message: 'auto deploy: ${{ github.event.head_commit.message }}'
           cname: blog.flytotmoon.cn
+
+      # ---- 搜索引擎主动推送（可选）----
+      # 百度：在仓库 Settings → Secrets 配置 BAIDU_TOKEN（百度站长平台 → 普通收录 → 推送接口）
+      - name: 主动推送 URL 到百度
+        if: env.BAIDU_TOKEN != ''
+        run: |
+          if [ -f public/sitemap_urls.txt ]; then
+            echo "推送 $(wc -l < public/sitemap_urls.txt) 个 URL 到百度…"
+            curl -s -H 'Content-Type:text/plain' --data-binary @public/sitemap_urls.txt \
+              "http://data.zz.baidu.com/urls?site=https://blog.flytotmoon.cn&token=${BAIDU_TOKEN}" || true
+          fi
+
+      # Bing/IndexNow：在仓库 Settings → Secrets 配置 INDEXNOW_KEY（任意 8-128 位字符串）
+      - name: 通知 IndexNow（Bing/Naver 等）
+        if: env.INDEXNOW_KEY != ''
+        run: |
+          FIRST=$(head -n 1 public/sitemap_urls.txt 2>/dev/null || echo "https://blog.flytotmoon.cn/")
+          curl -s "https://api.indexnow.org/indexnow?url=${FIRST}&key=${INDEXNOW_KEY}" || true

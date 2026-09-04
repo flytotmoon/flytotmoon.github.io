@@ -1,6 +1,6 @@
 - class_name: 北京之旅
   path_name: /beijing-trip
-  type: 2
+  type: 1
   description: 这里存放的是有关我在北京游玩的点滴记录。
   top_link: /album
   top_btn_text: 返回

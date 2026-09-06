@@ -43,9 +43,9 @@
     cover: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/109951166872133275.jpg
   map:
     title: 我现在住在
-    StrengthenTitle: 中国，银川市
-    background: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/0b9841a3cee7628e308816dfe4a8d24c.jpg
-    backgroundDark: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/0b9841a3cee7628e308816dfe4a8d24c.jpg
+    StrengthenTitle: 中国，广州市
+    background: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/e42e4099c710ae20078c453d6deef071.jpg
+    backgroundDark: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/e42e4099c710ae20078c453d6deef071.jpg
   selfInfo:
     selfInfoTips1: 生于
     selfInfoContentYear: 2003
@@ -94,7 +94,7 @@
   like:
     like_tips: 关注偏好
     like_title: 哲学
-    like_bg: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/chinese_posters_v2_48.jpg
+    like_bg: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/e963676048a4c7cfd2c625f10ffbe29d.jpg
     like_bottom: 毛泽东思想、马克思主义、黑格尔、尼采、萨特
   music:
     music_tips: 音乐偏好

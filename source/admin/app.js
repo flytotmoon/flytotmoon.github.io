@@ -1368,15 +1368,41 @@ async function renderPosts(container, scope) {
 
 /* ------------------------------ chips 输入组件 ------------------------------ */
 
-function chipsInput(container, initial = [], placeholder = '输入后回车') {
+function chipsInput(container, initial = [], placeholder = '输入后回车', suggestions = []) {
   const items = [...initial];
   const render = (keepFocus = false) => {
     container.innerHTML = `
       ${items.map((it, i) => `<span class="chip">${esc(it)}<span class="chip-x" data-i="${i}">×</span></span>`).join('')}
-      <input type="text" placeholder="${esc(placeholder)}" />`;
+      <input type="text" placeholder="${esc(placeholder)}" />
+      <div class="chips-suggest hidden"></div>`;
     const input = $('input', container);
+    const suggest = $('.chips-suggest', container);
     if (keepFocus) input.focus();
+
+    // 已有条目建议面板
+    const renderSuggest = (keyword) => {
+      const kw = String(keyword || '').trim().toLowerCase();
+      const pool = suggestions.filter((s) => !items.includes(s));
+      const list = kw ? pool.filter((s) => s.toLowerCase().includes(kw)) : pool;
+      if (!list.length) {
+        suggest.innerHTML = `<div class="suggest-empty">${pool.length ? '没有匹配的已有条目，回车可新建' : '暂无已有条目，输入后回车新建'}</div>`;
+      } else {
+        suggest.innerHTML = list.slice(0, 12)
+          .map((s) => `<div class="suggest-item" data-value="${esc(s)}">${esc(s)}</div>`)
+          .join('');
+      }
+      suggest.classList.remove('hidden');
+    };
+    const closeSuggest = () => suggest.classList.add('hidden');
+
+    input.addEventListener('focus', () => renderSuggest(input.value));
+    input.addEventListener('input', () => renderSuggest(input.value));
     input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeSuggest();
+        input.blur();
+        return;
+      }
       if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
         e.preventDefault();
         const v = input.value.trim().replace(/,|，/g, '');
@@ -1390,6 +1416,7 @@ function chipsInput(container, initial = [], placeholder = '输入后回车') {
     });
     // 失焦只处理未确认的输入，绝不抢焦点（这是「光标总跳回标签框」的根源）
     input.addEventListener('blur', () => {
+      setTimeout(closeSuggest, 180);
       const v = input.value.trim();
       input.value = '';
       if (v && !items.includes(v)) {
@@ -1405,6 +1432,15 @@ function chipsInput(container, initial = [], placeholder = '输入后回车') {
     });
   };
   render(false);
+  // 点击建议项：mousedown 阻止输入框失焦（否则面板先被销毁，点击落空）
+  container.addEventListener('mousedown', (e) => {
+    const it = e.target && e.target.closest ? e.target.closest('.suggest-item') : null;
+    if (!it) return;
+    e.preventDefault();
+    const v = it.dataset.value;
+    if (v && !items.includes(v)) items.push(v);
+    render(true);
+  });
   // 点击容器空白区域时才聚焦输入框（不影响其他字段）
   container.addEventListener('click', (e) => {
     if (e.target === container) {
@@ -1605,8 +1641,22 @@ async function renderEditor(container, params) {
     </div>
     <input type="file" id="ed-file-input" accept="image/*" style="display:none" multiple />`;
 
-  EDITOR_STATE.chipsCats = chipsInput($('#ed-categories'), [], '分类，回车添加');
-  EDITOR_STATE.chipsTags = chipsInput($('#ed-tags'), [], '标签，回车添加');
+  // 已有分类/标签建议（读取统计信息，缓存 60 秒）
+  let metaCache = window.__metaCache;
+  if (!metaCache || !window.__metaTime || Date.now() - window.__metaTime > 60000) {
+    try {
+      metaCache = await api('/api/meta');
+      window.__metaCache = metaCache;
+      window.__metaTime = Date.now();
+    } catch (e) {
+      metaCache = null;
+    }
+  }
+  const catSuggest = metaCache ? (metaCache.categories || []).map((c) => c.name) : [];
+  const tagSuggest = metaCache ? (metaCache.tags || []).map((t) => t.name) : [];
+
+  EDITOR_STATE.chipsCats = chipsInput($('#ed-categories'), [], '分类：输入或从已有选择', catSuggest);
+  EDITOR_STATE.chipsTags = chipsInput($('#ed-tags'), [], '标签：输入或从已有选择', tagSuggest);
 
   const ta = $('#ed-content');
   const preview = $('#ed-preview');

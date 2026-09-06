@@ -1,4 +1,4 @@
----
+﻿---
 title: flytotmoon 博客后台管理系统介绍
 date: 2026-08-26 19:54:00
 tags:
@@ -6,7 +6,6 @@ tags:
   - 技术
 categories:
   - 网络技术
-  - 杂文
 cover: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/109951165174477997.jpg
 description: 好用的后台管理系统
 sticky: 1

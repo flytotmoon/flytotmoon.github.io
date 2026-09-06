@@ -43,20 +43,20 @@
     cover: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/109951166872133275.jpg
   map:
     title: 我现在住在
-    StrengthenTitle: 中国，银川市
-    background: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/0b9841a3cee7628e308816dfe4a8d24c.jpg
-    backgroundDark: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/0b9841a3cee7628e308816dfe4a8d24c.jpg
+    StrengthenTitle: 中国，广州市
+    background: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/e42e4099c710ae20078c453d6deef071.jpg
+    backgroundDark: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/e42e4099c710ae20078c453d6deef071.jpg
   selfInfo:
     selfInfoTips1: 生于
     selfInfoContentYear: 2003
     selfInfoTips2: 中北大学
     selfInfoContent2: 应用物理学
     selfInfoTips3: 现在职业
-    selfInfoContent3: 工程师🧐
+    selfInfoContent3: 见习工程师🧐
   personalities:
     author_name: 调停者
     personality_type: INFP
-    photo_url: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/IMG_20251006_012711.jpg
+    photo_url: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/da8a2d6b679900902333f2916cad5fe4_720.jpg
     personality_img: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20250917223557.png
     name_url: https://www.16personalities.com/ch/infp-%E4%BA%BA%E6%A0%BC
   maxim:
@@ -71,7 +71,7 @@
     game_tips: 爱好游戏
     game_title: 怪物猎人、博德之门、丝之歌···
     game_uid: "steam好友代码: 374820289"
-    game_bg: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/ScreenShot-2025-7-25_14-20-6.png
+    game_bg: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260906112508634.png
   comic:
     comic_tips: 爱好读书
     comic_title: 读书
@@ -94,7 +94,7 @@
   like:
     like_tips: 关注偏好
     like_title: 哲学
-    like_bg: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/chinese_posters_v2_48.jpg
+    like_bg: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/5869239ac61378d17327813c1930f632.jpg
     like_bottom: 毛泽东思想、马克思主义、黑格尔、尼采、萨特
   music:
     music_tips: 音乐偏好

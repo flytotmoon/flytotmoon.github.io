@@ -172,7 +172,13 @@ function b64encode(str) {
 }
 
 function b64decode(b64) {
-  return decodeURIComponent(escape(atob(String(b64).replace(/\s/g, ''))));
+  const bin = atob(String(b64).replace(/\s/g, ''));
+  try {
+    return decodeURIComponent(escape(bin));
+  } catch (e) {
+    // 图片等二进制内容无法按 UTF-8 解码，直接返回原始字节串（避免抛「URI malformed」）
+    return bin;
+  }
 }
 
 /** 与本地服务一致的 key 编解码（base64url） */
@@ -271,6 +277,15 @@ async function ghReadFile(path) {
     sha: data.sha,
     text: data.encoding === 'base64' && data.content ? b64decode(data.content) : (data.content || ''),
   };
+}
+
+/**
+ * 只取文件元信息（sha / 大小），不解码内容。
+ * 图片等二进制文件用文本方式解码会抛「URI malformed」，删除/覆盖时必须用它。
+ */
+async function ghFileMeta(path) {
+  const data = await ghFetch(`${ghRepo()}/contents/${ghPath(path)}?ref=${encodeURIComponent(GH.branch)}`);
+  return { sha: data.sha, size: data.size || 0, encoding: data.encoding || '' };
 }
 
 async function ghWriteFile(path, text, sha, message) {
@@ -602,7 +617,7 @@ async function githubApi(path, opts = {}) {
         const dir = scope === 'drafts' ? draftsDir : postsDir;
         const relPath = b64urlDecode(rest);
         const filePath = dir + '/' + relPath;
-        const { sha } = await ghReadFile(filePath);
+        const { sha } = await ghFileMeta(filePath);
         await ghDeleteFile(filePath, sha, `admin: 删除「${relPath}」`);
         invalidateCaches();
         return wrap({ message: '已从仓库删除（可通过 Git 历史找回）' });
@@ -636,7 +651,7 @@ async function githubApi(path, opts = {}) {
       if (!key) throw new Error('缺少 key 参数');
       if ((STORAGE.backend || 'github') === 'github') {
         const filePath = mediaDir + '/' + key;
-        const { sha } = await ghReadFile(filePath);
+        const { sha } = await ghFileMeta(filePath);
         await ghDeleteFile(filePath, sha, `admin: 删除图片 ${key}`);
         invalidateCaches();
         return wrap({ message: '已从仓库删除' });
@@ -653,7 +668,7 @@ async function githubApi(path, opts = {}) {
     if (mMedia && method === 'DELETE') {
       const rel = decodeURIComponent(mMedia[1]);
       const filePath = mediaDir + '/' + rel;
-      const { sha } = await ghReadFile(filePath);
+      const { sha } = await ghFileMeta(filePath);
       await ghDeleteFile(filePath, sha, `admin: 删除图片 ${rel}`);
       invalidateCaches();
       return wrap({ message: '已删除' });
@@ -782,7 +797,7 @@ async function githubApi(path, opts = {}) {
       const name = body.file || '';
       if (!['_config.yml', '_config.anzhiyu.yml'].includes(name)) throw new Error('不允许修改该文件');
       if (typeof body.content !== 'string') throw new Error('缺少内容');
-      const { sha } = await ghReadFile(name);
+      const { sha } = await ghFileMeta(name);
       await ghWriteFile(name, body.content, sha, `admin: 更新 ${name}`);
       return wrap({ message: '保存成功（Git 历史即备份）' });
     }

@@ -113,38 +113,57 @@
     return `https://${ossHost(cfg)}/${encodeKeyPath(key)}`;
   }
 
-  /** OSS 签名 V1（PUT/DELETE 等无 subresource 请求） */
-  async function ossSign(cfg, method, contentType, date, resource) {
-    const stringToSign = `${method}\n\n${contentType}\n${date}\n${resource}`;
+  /**
+   * OSS 签名 V1
+   * 用 x-oss-date 而不是 Date：浏览器的 fetch 禁止脚本设置 Date 请求头（会被静默丢弃，
+   * 导致 OSS 返回 403 AccessDenied "requires a valid Date"）。
+   * 按规范，x-oss-date 既是 StringToSign 里的时间戳，也要计入 CanonicalizedOSSHeaders。
+   */
+  async function ossSign(cfg, method, contentType, date, resource, includeOssHeaders = true) {
+    const ossHeaders = includeOssHeaders ? `x-oss-date:${date}\n` : '';
+    const stringToSign = `${method}\n\n${contentType}\n${date}\n${ossHeaders}${resource}`;
     const sig = await hmacSha1Base64(cfg.accessKeySecret, stringToSign);
     return `OSS ${cfg.accessKeyId}:${sig}`;
   }
 
+  /**
+   * 发送一次 OSS 请求；若 OSS 返回 SignatureDoesNotMatch，则自动换一种
+   * 「x-oss-date 是否计入签名头」的算法重试（不同实现/区域存在差异）。
+   */
+  async function ossSend(cfg, { method, url, resource, contentType = '', body }) {
+    let out = null;
+    for (const includeOssHeaders of [true, false]) {
+      const date = new Date().toUTCString();
+      const auth = await ossSign(cfg, method, contentType, date, resource, includeOssHeaders);
+      const headers = { 'x-oss-date': date, Authorization: auth };
+      if (contentType) headers['Content-Type'] = contentType;
+      const res = await fetchOrExplain(url, { method, headers, body });
+      const text = await res.text().catch(() => '');
+      out = { res, text };
+      if (res.ok || !/SignatureDoesNotMatch/i.test(text)) return out;
+    }
+    return out;
+  }
+
   /** 上传对象到 OSS */
   async function ossPut(cfg, key, bytes, contentType) {
-    const date = new Date().toUTCString();
-    const resource = `/${cfg.bucket}/${key}`;
-    const auth = await ossSign(cfg, 'PUT', contentType || 'application/octet-stream', date, resource);
-    const res = await fetchOrExplain(`https://${ossHost(cfg)}/${encodeKeyPath(key)}`, {
+    const type = contentType || 'application/octet-stream';
+    const { res, text } = await ossSend(cfg, {
       method: 'PUT',
-      headers: {
-        Date: date,
-        'Content-Type': contentType || 'application/octet-stream',
-        Authorization: auth,
-      },
+      url: `https://${ossHost(cfg)}/${encodeKeyPath(key)}`,
+      resource: `/${cfg.bucket}/${key}`,
+      contentType: type,
       body: bytes,
     });
     if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      throw new Error(`OSS 上传失败：HTTP ${res.status} ${txt.slice(0, 180)}`);
+      throw new Error(`OSS 上传失败：HTTP ${res.status} ${text.slice(0, 200)}`);
     }
     return { url: ossPublicUrl(cfg, key), key };
   }
 
   /**
    * 列出 OSS 对象（ListObjects V1）
-   * 签名时子资源 prefix 的编码方式各端实现不一致（URL 编码 / 原文），
-   * 因此这里先按 URL 编码签名，若返回 SignatureDoesNotMatch 再用原文重试一次。
+   * 子资源 prefix 的编码方式各端实现不一致（URL 编码 / 原文），两种都试。
    */
   async function ossList(cfg, prefix, max) {
     const keys = max || 200;
@@ -157,15 +176,14 @@
     let text = '';
     let lastErr = '';
     for (const resource of resources) {
-      const date = new Date().toUTCString();
-      const auth = await ossSign(cfg, 'GET', '', date, resource);
-      const res = await fetchOrExplain(`https://${ossHost(cfg)}/?${query}`, {
+      const out = await ossSend(cfg, {
         method: 'GET',
-        headers: { Date: date, Authorization: auth },
+        url: `https://${ossHost(cfg)}/?${query}`,
+        resource,
       });
-      text = await res.text();
-      if (res.ok) { lastErr = ''; break; }
-      lastErr = `HTTP ${res.status} ${text.slice(0, 180)}`;
+      text = out.text;
+      if (out.res.ok) { lastErr = ''; break; }
+      lastErr = `HTTP ${out.res.status} ${text.slice(0, 200)}`;
       if (!/SignatureDoesNotMatch/i.test(text)) break;
     }
     if (lastErr) throw new Error(`OSS 列表获取失败：${lastErr}`);
@@ -194,16 +212,13 @@
 
   /** 删除 OSS 对象 */
   async function ossDelete(cfg, key) {
-    const date = new Date().toUTCString();
-    const resource = `/${cfg.bucket}/${key}`;
-    const auth = await ossSign(cfg, 'DELETE', '', date, resource);
-    const res = await fetchOrExplain(`https://${ossHost(cfg)}/${encodeKeyPath(key)}`, {
+    const { res, text } = await ossSend(cfg, {
       method: 'DELETE',
-      headers: { Date: date, Authorization: auth },
+      url: `https://${ossHost(cfg)}/${encodeKeyPath(key)}`,
+      resource: `/${cfg.bucket}/${key}`,
     });
     if (!res.ok && res.status !== 404) {
-      const txt = await res.text().catch(() => '');
-      throw new Error(`OSS 删除失败：HTTP ${res.status} ${txt.slice(0, 180)}`);
+      throw new Error(`OSS 删除失败：HTTP ${res.status} ${text.slice(0, 200)}`);
     }
     return true;
   }

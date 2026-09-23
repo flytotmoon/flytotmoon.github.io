@@ -270,16 +270,46 @@ async function main() {
   // OSS 直传：拦截 fetch 校验 V1 签名
   const realFetch = global.fetch;
   let captured = null;
-  global.fetch = async (url, opts) => { captured = { url, opts }; return { ok: true, status: 200, text: async () => '' }; };
+  let reqs = [];
+  global.fetch = async (url, opts) => { captured = { url, opts }; reqs.push(captured); return { ok: true, status: 200, text: async () => '' }; };
   try {
     const ossCfg = { accessKeyId: 'ak', accessKeySecret: 'sk', bucket: 'bkt', endpoint: 'oss-cn-beijing.aliyuncs.com', dirPrefix: 'img/upload', customDomain: '' };
     const ossOut = await StorageMod.upload({ backend: 'oss', oss: ossCfg }, { filename: 'a.png', contentType: 'image/png', bytes: png });
-    const date = captured.opts.headers.Date;
-    const expect = 'OSS ak:' + cryptoMod.createHmac('sha1', 'sk').update(`PUT\n\nimage/png\n${date}\n/bkt/${ossOut.key}`).digest('base64');
-    assert('OSS 直传签名（V1）正确', captured.opts.headers.Authorization === expect, captured.opts.headers.Authorization);
+    const date = captured.opts.headers['x-oss-date'];
+    const expect = 'OSS ak:' + cryptoMod.createHmac('sha1', 'sk').update(`PUT\n\nimage/png\n${date}\nx-oss-date:${date}\n/bkt/${ossOut.key}`).digest('base64');
+    assert('OSS 直传签名（V1，x-oss-date）正确', captured.opts.headers.Authorization === expect, captured.opts.headers.Authorization);
+    assert('不再使用浏览器禁止的 Date 请求头', captured.opts.headers.Date === undefined && /^\w{3}, \d{2} \w{3} \d{4} [\d:]{8} GMT$/.test(date), String(date));
     assert('OSS 直传地址正确', captured.url === `https://bkt.oss-cn-beijing.aliyuncs.com/${ossOut.key}`, captured.url);
     assert('OSS 公共访问地址正确', ossOut.url === `https://bkt.oss-cn-beijing.aliyuncs.com/${ossOut.key}`, ossOut.url);
     assert('OSS 自定义域名优先生效', StorageMod.ossPublicUrl({ bucket: 'bkt', endpoint: 'oss-cn-beijing.aliyuncs.com', customDomain: 'https://img.example.com/' }, 'a/b.png') === 'https://img.example.com/a/b.png');
+
+    // 签名变体自动重试：首次 SignatureDoesNotMatch → 第二次改用不计入 x-oss-date 的算法
+    reqs = [];
+    global.fetch = async (url, opts) => {
+      reqs.push({ url, opts });
+      return reqs.length === 1
+        ? { ok: false, status: 403, text: async () => '<?xml version="1.0"?><Error><Code>SignatureDoesNotMatch</Code></Error>' }
+        : { ok: true, status: 200, text: async () => '' };
+    };
+    const fbOut = await StorageMod.upload({ backend: 'oss', oss: ossCfg }, { filename: 'b.png', contentType: 'image/png', bytes: png });
+    assert('签名不匹配时自动重试一次', reqs.length === 2, reqs.length);
+    const d2 = reqs[1].opts.headers['x-oss-date'];
+    const expect2 = 'OSS ak:' + cryptoMod.createHmac('sha1', 'sk').update(`PUT\n\nimage/png\n${d2}\n/bkt/${fbOut.key}`).digest('base64');
+    assert('重试改用不计入 x-oss-date 的签名', reqs[1].opts.headers.Authorization === expect2, reqs[1].opts.headers.Authorization);
+
+    // 签名正确但服务端 403（如权限不足）时不应无限重试
+    reqs = [];
+    global.fetch = async (url, opts) => {
+      reqs.push({ url, opts });
+      return { ok: false, status: 403, text: async () => '<Error><Code>AccessDenied</Code></Error>' };
+    };
+    let denied = '';
+    try {
+      await StorageMod.upload({ backend: 'oss', oss: ossCfg }, { filename: 'c.png', contentType: 'image/png', bytes: png });
+    } catch (e) {
+      denied = e.message;
+    }
+    assert('AccessDenied 立即报错且不重试', reqs.length === 1 && /AccessDenied/.test(denied), `${reqs.length} / ${denied}`);
   } finally {
     global.fetch = realFetch;
   }

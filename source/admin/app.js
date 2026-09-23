@@ -2844,7 +2844,7 @@ function mediaSettingsHTML() {
   const cu = STORAGE.custom || {};
   const headerLines = (cu.headers || []).map((h) => `${h.name}: ${h.value}`).join('\n');
   const corsTip = MODE === 'github'
-    ? `<p class="hint">浏览器直传 OSS 需先给 Bucket 配置跨域规则（CORS）：来源 <code>${esc(location.origin)}</code>、允许方法 <code>PUT, POST, GET, HEAD</code>、允许 Headers <code>*</code>。未配置会提示跨域失败。Bucket 设为公共读后图片可直接外链。</p>`
+    ? `<p class="hint">浏览器直传 OSS 需先给 Bucket 配置跨域规则（CORS）：来源 <code>${esc(location.origin)}</code>、允许方法 <code>PUT, POST, GET, HEAD, DELETE</code>、允许 Headers 直接填 <code>*</code>（若要逐项指定，至少要有 <code>authorization</code> 与 <code>x-oss-date</code>）。未配置会提示跨域失败。Bucket 设为公共读后图片可直接外链。</p>`
     : '<p class="hint">本机模式由后台服务代签名直传 OSS，无需配置 CORS。</p>';
   const tabs = Object.keys(BACKENDS)
     .map((k) => `<button class="picgo-tab ${backend === k ? 'active' : ''}" data-backend="${k}">${esc(BACKENDS[k].name)}</button>`)

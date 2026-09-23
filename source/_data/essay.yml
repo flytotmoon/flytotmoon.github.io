@@ -7,6 +7,10 @@
   home_essay: true
   top_background: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/CC4B6E24C241768D31C88C8ABEC81E6E.jpg
   essay_list:
+    - content: 又加强了一下博客后台。
+      date: 2026/09/23
+      # image:
+      #   - https://图片地址（图片请用列表格式，一行一个）
     - content: 前天去了贺兰山的滚钟口。
       date: 2026/09/06
       image:

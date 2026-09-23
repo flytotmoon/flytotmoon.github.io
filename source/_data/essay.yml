@@ -7,6 +7,10 @@
   home_essay: true
   top_background: https://xsxtk.oss-cn-beijing.aliyuncs.com/img/CC4B6E24C241768D31C88C8ABEC81E6E.jpg
   essay_list:
+    - content: 前天去了贺兰山的滚钟口。
+      date: 2026/09/06
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/b155f4ea4a2181e21f20ce4d80af83ee.jpg
     - content: 今天去了花博园玩。
       date: 2026/09/02
       image:
@@ -37,4 +41,4 @@
       date: 2026/08/26
     - content: 今天写写文章
       date: 2026/08/30
- 
+  

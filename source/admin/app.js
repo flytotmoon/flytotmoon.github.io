@@ -643,8 +643,9 @@ async function githubApi(path, opts = {}) {
       if ((STORAGE.backend || 'github') === 'github') {
         return wrap({ backend: 'github', files: await ghListMedia() });
       }
-      const files = await FTMStorage.list(STORAGE, 200);
-      return wrap({ backend: STORAGE.backend, files });
+      const limit = Math.max(1, Math.min(Number(q.get('limit')) || 2000, 10000));
+      const files = await FTMStorage.list(STORAGE, limit);
+      return wrap({ backend: STORAGE.backend, files, truncated: Boolean(files.truncated), limit });
     }
     if (p === '/api/gallery' && method === 'DELETE') {
       const key = q.get('key') || '';
@@ -2865,7 +2866,13 @@ function mediaSettingsHTML() {
         <label class="field"><span>存储目录前缀</span><input id="st-oss-prefix" value="${esc(oss.dirPrefix || '')}" placeholder="img/upload" /></label>
         <label class="field"><span>自定义域名 / CDN（可选）</span><input id="st-oss-domain" value="${esc(oss.customDomain || '')}" placeholder="https://img.example.com" /></label>
       </div>
-      <p class="hint">Endpoint 填 <code>oss-cn-beijing.aliyuncs.com</code> 这种完整形式（只填 <code>oss-cn-beijing</code> 保存时会自动补全，带 <code>https://</code> 或误带 Bucket 前缀也会自动纠正）。目录前缀填 <code>img/upload</code> 或与现有图片一致的 <code>img</code>。AccessKey Secret 为 <b>30 位</b>，保存时会自动去掉多余空格/换行；若一直提示「签名不匹配」，九成是 Secret 复制不完整或与 AccessKey ID 不是同一个账号。</p>
+      <p class="hint">Endpoint 填 <code>oss-cn-beijing.aliyuncs.com</code> 这种完整形式（只填 <code>oss-cn-beijing</code> 保存时会自动补全，带 <code>https://</code> 或误带 Bucket 前缀也会自动纠正）。AccessKey Secret 为 <b>30 位</b>，保存时会自动去掉多余空格/换行；若一直提示「签名不匹配」，九成是 Secret 复制不完整或与 AccessKey ID 不是同一个账号。</p>
+      <p class="hint">「存储目录前缀」既是上传目标目录，也是云相册的读取范围：填 <code>img</code> 会读取 <code>img/</code> 下的<b>全部图片</b>（自动翻页，最多 2000 张，可搜索），上传也放到 <code>img/</code> 下；留空则读取整个 Bucket。例如你现有图片在 <code>img/xxx.jpg</code>，前缀就填 <code>img</code>。</p>
+      <label class="picgo-switch" style="margin:10px 0 4px">
+        <input type="checkbox" id="st-oss-month" ${oss.monthDir === false ? '' : 'checked'} />
+        <span>上传时按月建子目录（如 <code>img/202609/</code>）</span>
+      </label>
+      <p class="hint" style="margin-top:0">想让新图和现有 <code>img/xxx.jpg</code> 放在同一层就取消勾选。</p>
       ${corsTip}
       <p class="hint">填成与博客现有图片相同的 Bucket 就能统一管理，例如 Bucket <code>xsxtk</code> + Endpoint <code>oss-cn-beijing.aliyuncs.com</code>。密钥只保存在本机 / 本浏览器，不会写进仓库。</p>
     </div>
@@ -2955,22 +2962,31 @@ async function renderMedia(container) {
 
   const dropzone = $('#media-dropzone');
   const fileInput = $('#media-file-input');
+  const PAGE_SIZE = 120; // 每次渲染的张数，避免一次插入上千个节点卡顿
   let items = [];
   let keyword = '';
+  let shown = PAGE_SIZE;
+  let galleryTruncated = false;
 
   /* ---------- 相册列表 ---------- */
 
   const renderGrid = () => {
     const grid = $('#media-grid');
-    const list = keyword
+    const matched = keyword
       ? items.filter((f) => f.name.toLowerCase().includes(keyword))
       : items;
-    $('#media-count').textContent = items.length ? `共 ${items.length} 张` : '';
+    const list = matched.slice(0, shown);
+    const countEl = $('#media-count');
+    countEl.textContent = items.length
+      ? `共 ${items.length} 张${keyword ? `（匹配 ${matched.length}）` : ''}${galleryTruncated ? '，已达读取上限' : ''}`
+      : '';
     if (!list.length) {
       grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">${
         items.length ? '没有匹配的图片' : (currentBackend() === 'custom'
           ? '该图床无法远程列举图片，可参考上方「最近上传」记录'
-          : '相册还是空的，上传第一张图片试试')
+          : currentBackend() === 'oss'
+            ? '没有读取到图片：请检查「图床设置」里的存储目录前缀是否正确（例如图片在 img/ 下就填 img），以及 AccessKey 是否有 oss:ListObjects 权限'
+            : '相册还是空的，上传第一张图片试试')
       }</div>`;
       return;
     }
@@ -2990,6 +3006,17 @@ async function renderMedia(container) {
           <div class="picgo-sub"><span>${fmtBytes(f.size)}</span>${f.mtime ? `<span>${fmtDate(f.mtime).slice(0, 10)}</span>` : ''}</div>
         </div>
       </div>`).join('');
+
+    if (matched.length > list.length) {
+      const more = document.createElement('button');
+      more.className = 'btn btn-ghost picgo-more';
+      more.textContent = `显示更多（还有 ${matched.length - list.length} 张）`;
+      more.addEventListener('click', () => {
+        shown += PAGE_SIZE;
+        renderGrid();
+      });
+      grid.appendChild(more);
+    }
 
     $$('img', grid).forEach((img) => img.addEventListener('error', () => img.classList.add('broken')));
     $$('.picgo-act', grid).forEach((btn) => btn.addEventListener('click', async (e) => {
@@ -3021,13 +3048,16 @@ async function renderMedia(container) {
 
   const load = async () => {
     const grid = $('#media-grid');
-    grid.innerHTML = '<div class="picgo-loading">正在读取云相册…</div>';
+    grid.innerHTML = '<div class="picgo-loading">正在读取云相册…（图片较多时 OSS 会自动翻页，请稍候）</div>';
     try {
-      const data = await api('/api/gallery');
+      const data = await api('/api/gallery?limit=2000');
       items = (data.files || []).map(normalizeGalleryFile);
+      galleryTruncated = Boolean(data.truncated) || (data.files || []).length >= (data.limit || 2000);
+      shown = PAGE_SIZE;
       renderGrid();
     } catch (e) {
       items = [];
+      galleryTruncated = false;
       grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">读取失败：${esc(e.message)}</div>`;
     }
   };
@@ -3121,6 +3151,7 @@ async function renderMedia(container) {
   });
   $('#media-search').addEventListener('input', (e) => {
     keyword = e.target.value.trim().toLowerCase();
+    shown = PAGE_SIZE;
     renderGrid();
   });
 
@@ -3154,6 +3185,7 @@ async function renderMedia(container) {
       endpoint: $('#st-oss-endpoint').value,
       dirPrefix: $('#st-oss-prefix').value,
       customDomain: $('#st-oss-domain').value,
+      monthDir: $('#st-oss-month') ? $('#st-oss-month').checked : true,
     });
     const next = {
       backend: activeTab ? activeTab.dataset.backend : currentBackend(),

@@ -122,6 +122,7 @@ const DEFAULT_STORAGE = () => ({
     endpoint: 'oss-cn-beijing.aliyuncs.com',
     dirPrefix: 'img/upload',
     customDomain: '',
+    monthDir: true, // 上传时是否按月建子目录（YYYYMM/）
   },
   custom: {
     uploadUrl: '',
@@ -1015,8 +1016,10 @@ async function handleApi(req, res, urlObj, user) {
       const files = await listMediaFiles();
       return sendJSON(res, 200, { ok: true, backend, files });
     }
-    const files = await Storage.list(cfg.storage, 200);
-    return sendJSON(res, 200, { ok: true, backend, files });
+    // 可传 ?limit= 覆盖默认上限（OSS 会自动翻页，默认 2000）
+    const limit = Math.max(1, Math.min(Number(urlObj.searchParams.get('limit')) || 2000, 10000));
+    const files = await Storage.list(cfg.storage, limit);
+    return sendJSON(res, 200, { ok: true, backend, files, truncated: Boolean(files.truncated), limit });
   }
 
   /* ---- 云相册删除 ---- */

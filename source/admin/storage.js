@@ -46,6 +46,24 @@
     return String(key).split('/').map(encodeURIComponent).join('/');
   }
 
+  /** URL 查询串：键按字典序，值 URL 编码 */
+  function buildOssQuery(params) {
+    return Object.keys(params).sort()
+      .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
+      .join('&');
+  }
+
+  /**
+   * CanonicalizedResource 的子资源串：键按字典序升序
+   * 签名时子资源值要用原值（与 ali-oss 一致），encodeValues=true 时用编码值
+   */
+  function buildOssResource(bucket, params, encodeValues) {
+    const sub = Object.keys(params).sort()
+      .map((k) => `${k}=${encodeValues ? encodeURIComponent(params[k]) : params[k]}`)
+      .join('&');
+    return `/${bucket}/?${sub}`;
+  }
+
   /** 生成上传文件名：YYYYMMDD-随机-名字.ext */
   function buildFileName(originalName) {
     const d = new Date();
@@ -128,6 +146,7 @@
       endpoint: normalizeEndpoint(c.endpoint, bucket),
       dirPrefix: String(c.dirPrefix || '').replace(/^\/+|\/+$/g, ''),
       customDomain: String(c.customDomain || '').replace(/\/+$/, ''),
+      monthDir: c.monthDir !== false,
     });
   }
 
@@ -201,51 +220,75 @@ ${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 请重�
   }
 
   /**
-   * 列出 OSS 对象（ListObjects V1）
-   * 子资源 prefix 的编码方式各端实现不一致（URL 编码 / 原文），两种都试。
+   * 列出 OSS 对象（ListObjects V1，自动翻页取全）
+   * - 子资源按字典序排序；URL 用编码值、签名用原值（与 ali-oss 官方实现一致），
+   *   若 OSS 返回 SignatureDoesNotMatch 则换另一种编码方式重试
+   * - V1 不带 delimiter 时不返回 NextMarker，用本页最后一个 Key 作为下一页的 marker
+   * @param {string} prefix 目录前缀，非空时按目录语义补 `/`（img → img/）
    */
   async function ossList(cfg, prefix, max) {
-    const keys = max || 200;
-    const enc = encodeURIComponent(prefix || '');
-    const raw = prefix || '';
-    const query = `max-keys=${keys}&prefix=${enc}`;
-    const resources = [`/${cfg.bucket}/?${query}`];
-    if (raw && raw !== enc) resources.push(`/${cfg.bucket}/?max-keys=${keys}&prefix=${raw}`);
+    const limit = Math.max(1, Math.min(Number(max) || 1000, 10000));
+    let dir = String(prefix || '').trim();
+    if (dir) dir = `${dir.replace(/\/+$/, '')}/`;
 
-    let out = null;
-    let lastErr = '';
-    for (const resource of resources) {
-      out = await ossSend(cfg, {
-        method: 'GET',
-        url: `https://${ossHost(cfg)}/?${query}`,
-        resource,
-      });
-      if (out.res.ok) { lastErr = ''; break; }
-      lastErr = explainOssError(out.res.status, out.text, out.stringToSign);
-      if (!/SignatureDoesNotMatch/i.test(out.text)) break;
-    }
-    if (lastErr) throw new Error(lastErr);
-    const text = out.text;
     const files = [];
-    const re = /<Contents>([\s\S]*?)<\/Contents>/g;
-    let m;
-    while ((m = re.exec(text))) {
-      const block = m[1];
-      const key = (/<Key>([\s\S]*?)<\/Key>/.exec(block) || [])[1] || '';
-      if (!key || key.endsWith('/')) continue;
-      if (!/\.(jpe?g|png|gif|webp|svg|avif|ico)$/i.test(key)) continue;
-      const size = Number((/<Size>(\d+)<\/Size>/.exec(block) || [])[1] || 0);
-      const lastMod = (/<LastModified>([\s\S]*?)<\/LastModified>/.exec(block) || [])[1] || '';
-      files.push({
-        key,
-        name: key.split('/').pop(),
-        rel: key,
-        url: ossPublicUrl(cfg, key),
-        size,
-        mtime: lastMod ? Date.parse(lastMod) || 0 : 0,
-      });
+    const seen = {};
+    let marker = '';
+    let truncated = false;
+
+    for (let page = 0; page < 20 && files.length < limit; page += 1) {
+      const params = { 'max-keys': Math.min(1000, limit - files.length) };
+      if (dir) params.prefix = dir;
+      if (marker) params.marker = marker;
+      const query = buildOssQuery(params);
+      const url = `https://${ossHost(cfg)}/?${query}`;
+
+      let out = null;
+      let lastErr = '';
+      for (const encodeValues of [false, true]) {
+        out = await ossSend(cfg, {
+          method: 'GET',
+          url,
+          resource: buildOssResource(cfg.bucket, params, encodeValues),
+        });
+        if (out.res.ok) { lastErr = ''; break; }
+        lastErr = explainOssError(out.res.status, out.text, out.stringToSign);
+        if (!/SignatureDoesNotMatch/i.test(out.text)) break;
+      }
+      if (lastErr) throw new Error(lastErr);
+
+      const text = out.text;
+      let lastKey = '';
+      const re = /<Contents>([\s\S]*?)<\/Contents>/g;
+      let m;
+      while ((m = re.exec(text))) {
+        const block = m[1];
+        const key = (/<Key>([\s\S]*?)<\/Key>/.exec(block) || [])[1] || '';
+        if (!key) continue;
+        lastKey = key;
+        if (key.endsWith('/') || seen[key]) continue;
+        if (!/\.(jpe?g|png|gif|webp|svg|avif|ico)$/i.test(key)) continue;
+        seen[key] = true;
+        const size = Number((/<Size>(\d+)<\/Size>/.exec(block) || [])[1] || 0);
+        const lastMod = (/<LastModified>([\s\S]*?)<\/LastModified>/.exec(block) || [])[1] || '';
+        files.push({
+          key,
+          name: key.split('/').pop(),
+          rel: key,
+          url: ossPublicUrl(cfg, key),
+          size,
+          mtime: lastMod ? Date.parse(lastMod) || 0 : 0,
+        });
+      }
+
+      truncated = /<IsTruncated>\s*true\s*<\/IsTruncated>/i.test(text);
+      if (!truncated || !lastKey || lastKey === marker) break;
+      marker = lastKey;
     }
+
     files.sort((a, b) => b.mtime - a.mtime);
+    files.truncated = truncated && files.length >= limit;
+    files.limit = limit;
     return files;
   }
 
@@ -310,7 +353,8 @@ ${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 请重�
         throw new Error('阿里云 OSS 配置不完整（需要 AccessKeyId / AccessKeySecret / Bucket / Endpoint）');
       }
       const info = buildFileName(file.filename);
-      const key = joinPrefix(cfg.dirPrefix, `${info.month}/${info.name}`);
+      // monthDir 为 false 时不上传月份子目录（与已存在的 img/xxx.jpg 布局保持一致）
+      const key = joinPrefix(cfg.dirPrefix, cfg.monthDir ? `${info.month}/${info.name}` : info.name);
       const out = await ossPut(cfg, key, file.bytes, file.contentType);
       return { url: out.url, key: out.key, backend: 'oss' };
     }
@@ -322,12 +366,12 @@ ${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 请重�
     throw new Error('github 图床由各端自行处理（仓库内 /img/upload）');
   }
 
-  /** 列出云端图片 */
+  /** 列出云端图片（OSS 会自动翻页，默认最多 2000 张） */
   async function list(storage, max) {
     const backend = (storage && storage.backend) || 'github';
     if (backend === 'oss') {
       const cfg = sanitizeOss((storage && storage.oss) || {});
-      return ossList(cfg, cfg.dirPrefix || '', max);
+      return ossList(cfg, cfg.dirPrefix || '', max || 2000);
     }
     return [];
   }

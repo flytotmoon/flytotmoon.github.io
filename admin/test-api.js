@@ -329,6 +329,35 @@ async function main() {
       denied = e.message;
     }
     assert('AccessDenied 立即报错且不重试', reqs.length === 1 && /AccessDenied/.test(denied), `${reqs.length} / ${denied}`);
+
+    // 云相册分页：IsTruncated + marker 翻页取全，prefix 按目录语义补 /
+    const listXml = (keys, truncated) => `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult>`
+      + keys.map((k) => `<Contents><Key>${k}</Key><LastModified>2026-09-01T00:00:00.000Z</LastModified><Size>2048</Size></Contents>`).join('')
+      + `<IsTruncated>${truncated}</IsTruncated></ListBucketResult>`;
+    reqs = [];
+    global.fetch = async (url, opts) => {
+      reqs.push({ url, opts });
+      const body = reqs.length === 1
+        ? listXml(['img/a.jpg', 'img/b.jpg'], true)
+        : listXml(['img/c.png'], false);
+      return { ok: true, status: 200, text: async () => body };
+    };
+    const gal = await StorageMod.list({ backend: 'oss', oss: Object.assign({}, ossCfg, { dirPrefix: 'img' }) }, 2000);
+    assert('OSS 相册自动翻页取全', gal.length === 3 && reqs.length === 2, `${gal.length} 张 / ${reqs.length} 次请求`);
+    assert('翻页用上一页最后一个 Key 作 marker', /marker=img%2Fb\.jpg/.test(reqs[1].url), reqs[1].url);
+    assert('prefix 按目录语义补斜杠', /prefix=img%2F/.test(reqs[0].url) && !/prefix=img&/.test(reqs[0].url), reqs[0].url);
+    const glDate = reqs[0].opts.headers['x-oss-date'];
+    const glExpect = 'OSS ak:' + cryptoMod.createHmac('sha1', 'sk').update(`GET\n\n\n${glDate}\nx-oss-date:${glDate}\n/bkt/?max-keys=1000&prefix=img/`).digest('base64');
+    assert('列表签名用原值子资源（与官方 SDK 一致）', reqs[0].opts.headers.Authorization === glExpect, reqs[0].opts.headers.Authorization);
+    assert('相册按时间倒序且带 URL', gal[0].url.startsWith('https://bkt.oss-cn-beijing.aliyuncs.com/img/'), gal[0].url);
+
+    // 上传目录：按月 / 平铺
+    reqs = [];
+    global.fetch = async (url, opts) => { reqs.push({ url, opts }); return { ok: true, status: 200, text: async () => '' }; };
+    const monthly = await StorageMod.upload({ backend: 'oss', oss: Object.assign({}, ossCfg, { dirPrefix: 'img', monthDir: true }) }, { filename: 'm.png', contentType: 'image/png', bytes: png });
+    assert('monthDir=true 按月建子目录', /^img\/\d{6}\/\d{8}-[0-9a-f]{8}-m\.png$/.test(monthly.key), monthly.key);
+    const flat = await StorageMod.upload({ backend: 'oss', oss: Object.assign({}, ossCfg, { dirPrefix: 'img', monthDir: false }) }, { filename: 'f.png', contentType: 'image/png', bytes: png });
+    assert('monthDir=false 平铺在同一层', /^img\/\d{8}-[0-9a-f]{8}-f\.png$/.test(flat.key), flat.key);
   } finally {
     global.fetch = realFetch;
   }

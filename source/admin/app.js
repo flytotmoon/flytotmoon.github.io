@@ -2865,7 +2865,7 @@ function mediaSettingsHTML() {
         <label class="field"><span>存储目录前缀</span><input id="st-oss-prefix" value="${esc(oss.dirPrefix || '')}" placeholder="img/upload" /></label>
         <label class="field"><span>自定义域名 / CDN（可选）</span><input id="st-oss-domain" value="${esc(oss.customDomain || '')}" placeholder="https://img.example.com" /></label>
       </div>
-      <p class="hint">Endpoint 填 <code>oss-cn-beijing.aliyuncs.com</code> 这种完整形式（只填 <code>oss-cn-beijing</code> 保存时会自动补全，带 <code>https://</code> 或误带 Bucket 前缀也会自动纠正）。目录前缀填 <code>img/upload</code> 或与现有图片一致的 <code>img</code>。</p>
+      <p class="hint">Endpoint 填 <code>oss-cn-beijing.aliyuncs.com</code> 这种完整形式（只填 <code>oss-cn-beijing</code> 保存时会自动补全，带 <code>https://</code> 或误带 Bucket 前缀也会自动纠正）。目录前缀填 <code>img/upload</code> 或与现有图片一致的 <code>img</code>。AccessKey Secret 为 <b>30 位</b>，保存时会自动去掉多余空格/换行；若一直提示「签名不匹配」，九成是 Secret 复制不完整或与 AccessKey ID 不是同一个账号。</p>
       ${corsTip}
       <p class="hint">填成与博客现有图片相同的 Bucket 就能统一管理，例如 Bucket <code>xsxtk</code> + Endpoint <code>oss-cn-beijing.aliyuncs.com</code>。密钥只保存在本机 / 本浏览器，不会写进仓库。</p>
     </div>
@@ -3147,16 +3147,17 @@ async function renderMedia(container) {
         const i = l.indexOf(':');
         return i === -1 ? { name: l, value: '' } : { name: l.slice(0, i).trim(), value: l.slice(i + 1).trim() };
       });
+    const oss = FTMStorage.sanitizeOss({
+      accessKeyId: $('#st-oss-key').value,
+      accessKeySecret: $('#st-oss-secret').value,
+      bucket: $('#st-oss-bucket').value,
+      endpoint: $('#st-oss-endpoint').value,
+      dirPrefix: $('#st-oss-prefix').value,
+      customDomain: $('#st-oss-domain').value,
+    });
     const next = {
       backend: activeTab ? activeTab.dataset.backend : currentBackend(),
-      oss: {
-        accessKeyId: $('#st-oss-key').value.trim(),
-        accessKeySecret: $('#st-oss-secret').value.trim(),
-        bucket: $('#st-oss-bucket').value.trim(),
-        endpoint: FTMStorage.normalizeEndpoint($('#st-oss-endpoint').value, $('#st-oss-bucket').value) || 'oss-cn-beijing.aliyuncs.com',
-        dirPrefix: $('#st-oss-prefix').value.trim().replace(/^\/+|\/+$/g, ''),
-        customDomain: $('#st-oss-domain').value.trim().replace(/\/+$/, ''),
-      },
+      oss: Object.assign({}, oss, { endpoint: oss.endpoint || 'oss-cn-beijing.aliyuncs.com' }),
       custom: {
         uploadUrl: $('#st-cu-url').value.trim(),
         fieldName: $('#st-cu-field').value.trim() || 'file',
@@ -3166,6 +3167,14 @@ async function renderMedia(container) {
     };
     if (next.backend === 'oss' && (!next.oss.accessKeyId || !next.oss.accessKeySecret || !next.oss.bucket)) {
       const go = await confirmModal('配置不完整', 'OSS 图床缺少 AccessKeyId / AccessKeySecret / Bucket，确定仍要保存吗？', true);
+      if (!go) return;
+    }
+    if (next.backend === 'oss' && next.oss.accessKeySecret && next.oss.accessKeySecret.length !== 30) {
+      const go = await confirmModal(
+        '密钥长度可疑',
+        `AccessKey Secret 一般是 30 位，当前是 ${next.oss.accessKeySecret.length} 位。复制不完整会一直报「签名不匹配」，建议重新从阿里云控制台复制一次（注意别把 AccessKey ID 填进来）。确定仍要保存吗？`,
+        true
+      );
       if (!go) return;
     }
     if (next.backend === 'custom' && !next.custom.uploadUrl) {

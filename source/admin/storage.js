@@ -76,14 +76,21 @@
    *   oss-cn-beijing                        → oss-cn-beijing.aliyuncs.com
    *   https://oss-cn-beijing.aliyuncs.com/  → oss-cn-beijing.aliyuncs.com
    *   xsxtk.oss-cn-beijing.aliyuncs.com     → oss-cn-beijing.aliyuncs.com（误把 Bucket 带进来）
+   *   xsxtk.oss-cn-beijing                  → oss-cn-beijing.aliyuncs.com（漏了 aliyuncs.com）
    */
   function normalizeEndpoint(endpoint, bucket) {
     let e = String(endpoint || '').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
     if (!e) return '';
     const b = String(bucket || '').trim();
     if (b && e.toLowerCase().startsWith(`${b.toLowerCase()}.`)) e = e.slice(b.length + 1);
+    const parts = e.split('.');
+    const ossIdx = parts.findIndex((p) => /^oss-[a-z0-9-]+$/i.test(p));
+    if (ossIdx >= 0) {
+      if (ossIdx > 0) parts.splice(0, ossIdx); // 丢掉误带进来的 Bucket 段
+      const rest = parts.join('.');
+      return /\.aliyuncs\.com(\.cn)?$/i.test(rest) ? rest : `${rest}.aliyuncs.com`;
+    }
     if (!e.includes('.')) return `${e}.aliyuncs.com`;
-    if (/^oss-[a-z0-9-]+$/i.test(e.split('.')[0]) && !/\.aliyuncs\.com(\.cn)?$/i.test(e)) return `${e}.aliyuncs.com`;
     return e;
   }
 
@@ -105,6 +112,38 @@
   function ossHost(cfg) {
     const endpoint = normalizeEndpoint(cfg.endpoint, cfg.bucket);
     return `${cfg.bucket}.${endpoint}`;
+  }
+
+  /**
+   * 清洗 OSS 配置：密钥里常见的手滑（空格、换行、引号、粘贴成两行）会直接导致
+   * SignatureDoesNotMatch，这里统一去掉空白与引号。
+   */
+  function sanitizeOss(cfg) {
+    const c = cfg || {};
+    const bucket = String(c.bucket || '').trim();
+    return Object.assign({}, c, {
+      accessKeyId: String(c.accessKeyId || '').replace(/[\s"']/g, ''),
+      accessKeySecret: String(c.accessKeySecret || '').replace(/[\s"']/g, ''),
+      bucket,
+      endpoint: normalizeEndpoint(c.endpoint, bucket),
+      dirPrefix: String(c.dirPrefix || '').replace(/^\/+|\/+$/g, ''),
+      customDomain: String(c.customDomain || '').replace(/\/+$/, ''),
+    });
+  }
+
+  /** 解析 OSS 的错误 XML，SignatureDoesNotMatch 时把 OSS 期望的签名串带出来 */
+  function explainOssError(status, xml, ours) {
+    const text = String(xml || '');
+    const code = (/<Code>([\s\S]*?)<\/Code>/.exec(text) || [])[1] || '';
+    const message = (/<Message>([\s\S]*?)<\/Message>/.exec(text) || [])[1] || '';
+    const requestId = (/<RequestId>([\s\S]*?)<\/RequestId>/.exec(text) || [])[1] || '';
+    if (code === 'SignatureDoesNotMatch' && ours) {
+      const expected = (/<StringToSign>([\s\S]*?)<\/StringToSign>/.exec(text) || [])[1] || '';
+      return `OSS 签名不匹配（HTTP ${status}）
+· 本机签名串：${JSON.stringify(ours)}
+${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 请重点检查 AccessKey Secret 是否复制完整（应为 30 位、无空格换行），以及它与 AccessKey ID 是否属于同一个账号${requestId ? `\n· RequestId：${requestId}` : ''}`;
+    }
+    return `OSS 请求失败：HTTP ${status} ${code ? `<${code}> ` : ''}${message || text.slice(0, 200)}${requestId ? `（RequestId ${requestId}）` : ''}`;
   }
 
   function ossPublicUrl(cfg, key) {
@@ -134,12 +173,14 @@
     let out = null;
     for (const includeOssHeaders of [true, false]) {
       const date = new Date().toUTCString();
-      const auth = await ossSign(cfg, method, contentType, date, resource, includeOssHeaders);
-      const headers = { 'x-oss-date': date, Authorization: auth };
+      const ossHeaders = includeOssHeaders ? `x-oss-date:${date}\n` : '';
+      const stringToSign = `${method}\n\n${contentType}\n${date}\n${ossHeaders}${resource}`;
+      const sig = await hmacSha1Base64(cfg.accessKeySecret, stringToSign);
+      const headers = { 'x-oss-date': date, Authorization: `OSS ${cfg.accessKeyId}:${sig}` };
       if (contentType) headers['Content-Type'] = contentType;
       const res = await fetchOrExplain(url, { method, headers, body });
       const text = await res.text().catch(() => '');
-      out = { res, text };
+      out = { res, text, stringToSign };
       if (res.ok || !/SignatureDoesNotMatch/i.test(text)) return out;
     }
     return out;
@@ -148,16 +189,14 @@
   /** 上传对象到 OSS */
   async function ossPut(cfg, key, bytes, contentType) {
     const type = contentType || 'application/octet-stream';
-    const { res, text } = await ossSend(cfg, {
+    const { res, text, stringToSign } = await ossSend(cfg, {
       method: 'PUT',
       url: `https://${ossHost(cfg)}/${encodeKeyPath(key)}`,
       resource: `/${cfg.bucket}/${key}`,
       contentType: type,
       body: bytes,
     });
-    if (!res.ok) {
-      throw new Error(`OSS 上传失败：HTTP ${res.status} ${text.slice(0, 200)}`);
-    }
+    if (!res.ok) throw new Error(explainOssError(res.status, text, stringToSign));
     return { url: ossPublicUrl(cfg, key), key };
   }
 
@@ -173,20 +212,20 @@
     const resources = [`/${cfg.bucket}/?${query}`];
     if (raw && raw !== enc) resources.push(`/${cfg.bucket}/?max-keys=${keys}&prefix=${raw}`);
 
-    let text = '';
+    let out = null;
     let lastErr = '';
     for (const resource of resources) {
-      const out = await ossSend(cfg, {
+      out = await ossSend(cfg, {
         method: 'GET',
         url: `https://${ossHost(cfg)}/?${query}`,
         resource,
       });
-      text = out.text;
       if (out.res.ok) { lastErr = ''; break; }
-      lastErr = `HTTP ${out.res.status} ${text.slice(0, 200)}`;
-      if (!/SignatureDoesNotMatch/i.test(text)) break;
+      lastErr = explainOssError(out.res.status, out.text, out.stringToSign);
+      if (!/SignatureDoesNotMatch/i.test(out.text)) break;
     }
-    if (lastErr) throw new Error(`OSS 列表获取失败：${lastErr}`);
+    if (lastErr) throw new Error(lastErr);
+    const text = out.text;
     const files = [];
     const re = /<Contents>([\s\S]*?)<\/Contents>/g;
     let m;
@@ -212,14 +251,12 @@
 
   /** 删除 OSS 对象 */
   async function ossDelete(cfg, key) {
-    const { res, text } = await ossSend(cfg, {
+    const { res, text, stringToSign } = await ossSend(cfg, {
       method: 'DELETE',
       url: `https://${ossHost(cfg)}/${encodeKeyPath(key)}`,
       resource: `/${cfg.bucket}/${key}`,
     });
-    if (!res.ok && res.status !== 404) {
-      throw new Error(`OSS 删除失败：HTTP ${res.status} ${text.slice(0, 200)}`);
-    }
+    if (!res.ok && res.status !== 404) throw new Error(explainOssError(res.status, text, stringToSign));
     return true;
   }
 
@@ -268,7 +305,7 @@
   async function upload(storage, file) {
     const backend = (storage && storage.backend) || 'github';
     if (backend === 'oss') {
-      const cfg = (storage && storage.oss) || {};
+      const cfg = sanitizeOss((storage && storage.oss) || {});
       if (!cfg.accessKeyId || !cfg.accessKeySecret || !cfg.bucket || !cfg.endpoint) {
         throw new Error('阿里云 OSS 配置不完整（需要 AccessKeyId / AccessKeySecret / Bucket / Endpoint）');
       }
@@ -289,7 +326,7 @@
   async function list(storage, max) {
     const backend = (storage && storage.backend) || 'github';
     if (backend === 'oss') {
-      const cfg = (storage && storage.oss) || {};
+      const cfg = sanitizeOss((storage && storage.oss) || {});
       return ossList(cfg, cfg.dirPrefix || '', max);
     }
     return [];
@@ -299,7 +336,7 @@
   async function remove(storage, key) {
     const backend = (storage && storage.backend) || 'github';
     if (backend === 'oss') {
-      return ossDelete((storage && storage.oss) || {}, key);
+      return ossDelete(sanitizeOss((storage && storage.oss) || {}), key);
     }
     throw new Error('该图床不支持删除操作');
   }
@@ -311,6 +348,8 @@
     joinPrefix,
     extractUrl,
     normalizeEndpoint,
+    sanitizeOss,
+    explainOssError,
     ossHost,
     ossPublicUrl,
     ossPut,

@@ -959,14 +959,16 @@ async function handleApi(req, res, urlObj, user) {
       custom: Object.assign({}, def.custom, body.custom || {}),
     };
     if (!Array.isArray(next.custom.headers)) next.custom.headers = [];
-    // Endpoint / 目录前缀归一化，容忍只填 region、带协议或误带 Bucket 的写法
-    next.oss.endpoint = Storage.normalizeEndpoint(next.oss.endpoint, next.oss.bucket) || def.oss.endpoint;
-    next.oss.dirPrefix = String(next.oss.dirPrefix || '').replace(/^\/+|\/+$/g, '');
-    next.oss.customDomain = String(next.oss.customDomain || '').replace(/\/+$/, '');
+    // 密钥/Endpoint/前缀归一化：密钥里多出的空格换行会直接导致 OSS 签名不匹配
+    next.oss = Storage.sanitizeOss(next.oss);
+    next.oss.endpoint = next.oss.endpoint || def.oss.endpoint;
     cfg.storage = next;
     saveConfig();
-    log(`已更新图床配置：${next.backend}${next.backend === 'oss' ? `（${next.oss.bucket}.${next.oss.endpoint}）` : ''}`);
-    return sendJSON(res, 200, { ok: true, storage: next, message: '图床配置已保存' });
+    const warn = next.backend === 'oss' && next.oss.accessKeySecret && next.oss.accessKeySecret.length !== 30
+      ? `（注意：AccessKey Secret 当前 ${next.oss.accessKeySecret.length} 位，通常为 30 位，请确认复制完整）`
+      : '';
+    log(`已更新图床配置：${next.backend}${next.backend === 'oss' ? `（${next.oss.bucket}.${next.oss.endpoint}）` : ''}${warn}`);
+    return sendJSON(res, 200, { ok: true, storage: next, message: `图床配置已保存${warn}` });
   }
 
   /* ---- 统一上传（按当前图床） ---- */

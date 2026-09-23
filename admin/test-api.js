@@ -246,6 +246,25 @@ async function main() {
   assert('Endpoint：完整域名原样保留', ep('oss-cn-beijing.aliyuncs.com', 'xsxtk') === 'oss-cn-beijing.aliyuncs.com');
   assert('Endpoint：空值返回空串', ep('', 'xsxtk') === '');
 
+  // 密钥清洗（空格/换行/引号会直接导致 SignatureDoesNotMatch）
+  const dirty = StorageMod.sanitizeOss({
+    accessKeyId: ' LTAI xxx \n',
+    accessKeySecret: 'abc def\n"ghi"',
+    bucket: ' bkt ',
+    endpoint: 'https://xsxtk.oss-cn-beijing/',
+    dirPrefix: '/img/',
+    customDomain: 'https://img.example.com/',
+  });
+  assert('sanitizeOss 清洗密钥空白与引号', dirty.accessKeyId === 'LTAIxxx' && dirty.accessKeySecret === 'abcdefghi', JSON.stringify([dirty.accessKeyId, dirty.accessKeySecret]));
+  assert('sanitizeOss 同时归一化 endpoint/前缀/域名', dirty.endpoint === 'oss-cn-beijing.aliyuncs.com' && dirty.dirPrefix === 'img' && dirty.bucket === 'bkt' && dirty.customDomain === 'https://img.example.com', JSON.stringify(dirty));
+
+  // OSS 错误解释：签名不匹配时把 OSS 期望的签名串带出来
+  const ourSign = 'GET\n\n\nX\n/xsxtk/?prefix=img';
+  const explained = StorageMod.explainOssError(403, `<Error><Code>SignatureDoesNotMatch</Code><Message>mismatch</Message><StringToSign>${ourSign}</StringToSign><RequestId>RID1</RequestId></Error>`, ourSign);
+  assert('签名不匹配提示含本机/OSS 签名串与 RequestId', /本机签名串/.test(explained) && /OSS 期望串/.test(explained) && /RID1/.test(explained), explained);
+  const deniedMsg = StorageMod.explainOssError(403, '<Error><Code>AccessDenied</Code><Message>no right</Message></Error>', ourSign);
+  assert('其它 OSS 错误给出 Code 与 Message', /AccessDenied/.test(deniedMsg) && /no right/.test(deniedMsg), deniedMsg);
+
   // 自定义图床：上传到本地 mock 服务
   const mock = httpMod.createServer((req, res) => {
     let len = 0;

@@ -192,6 +192,19 @@ async function ghTree(force) {
   return data;
 }
 
+/** 目录树失效（任何写入操作后调用，避免列表读到旧缓存） */
+function ghTreeInvalidate() {
+  ghTreeCache = null;
+  ghTreeTime = 0;
+}
+
+/** 写入操作后统一失效缓存（目录树 + 统计信息） */
+function invalidateCaches() {
+  ghTreeInvalidate();
+  window.__metaCache = null;
+  window.__metaTime = 0;
+}
+
 /** 列出某目录下的 .md 文件（大仓库 truncated 时按目录递归抓取） */
 async function ghListPathsUnder(dir) {
   const prefix = String(dir).replace(/\/+$/, '') + '/';
@@ -314,6 +327,7 @@ async function githubUpload(formData) {
     method: 'PUT',
     body: JSON.stringify({ message: `admin: 上传图片 ${rel}`, content: btoa(bin), branch: GH.branch }),
   });
+  invalidateCaches();
   return { ok: true, name, rel, url: '/img/upload/' + rel };
 }
 
@@ -442,6 +456,7 @@ async function githubApi(path, opts = {}) {
       while (existing.has(dir + '/' + subdir + name)) { name = `${base}-${n}.md`; n++; }
       const relPath = subdir + name;
       await ghWriteFile(dir + '/' + relPath, FM.buildFrontMatter(data, content), null, `admin: 新建文章「${title}」`);
+      invalidateCaches();
       return wrap({ key: b64urlEncode(relPath) });
     }
 
@@ -472,6 +487,7 @@ async function githubApi(path, opts = {}) {
         const newRel = subdir + name;
         await ghWriteFile(postsDir + '/' + newRel, content, null, `admin: 发布草稿「${FM.fmGet(data, 'title')}」`);
         await ghDeleteFile(filePath, sha, `admin: 发布后删除草稿 ${relPath}`);
+        invalidateCaches();
         return wrap({ key: b64urlEncode(newRel) });
       }
 
@@ -532,9 +548,11 @@ async function githubApi(path, opts = {}) {
           const newRel = parent + name;
           await ghWriteFile(dir + '/' + newRel, newContent, null, `admin: 更新并重命名「${newTitle}」`);
           await ghDeleteFile(filePath, sha, `admin: 删除旧文件 ${relPath}`);
+          invalidateCaches();
           return wrap({ key: b64urlEncode(newRel) });
         }
         await ghWriteFile(filePath, newContent, sha, `admin: 更新「${newTitle}」`);
+        invalidateCaches();
         return wrap({ key: b64urlEncode(relPath) });
       }
 
@@ -545,6 +563,7 @@ async function githubApi(path, opts = {}) {
         const filePath = dir + '/' + relPath;
         const { sha } = await ghReadFile(filePath);
         await ghDeleteFile(filePath, sha, `admin: 删除「${relPath}」`);
+        invalidateCaches();
         return wrap({ message: '已从仓库删除（可通过 Git 历史找回）' });
       }
     }
@@ -559,6 +578,7 @@ async function githubApi(path, opts = {}) {
       const filePath = mediaDir + '/' + rel;
       const { sha } = await ghReadFile(filePath);
       await ghDeleteFile(filePath, sha, `admin: 删除图片 ${rel}`);
+      invalidateCaches();
       return wrap({ message: '已删除' });
     }
 
@@ -756,6 +776,8 @@ async function api(path, opts = {}) {
   let data = null;
   try { data = await res.json(); } catch (e) { /* ignore */ }
   if (!res.ok) throw new Error((data && data.message) || `请求失败 (${res.status})`);
+  // 写入类请求成功后失效统计缓存，保证列表/仪表盘显示最新数据
+  if ((opts.method || 'GET').toUpperCase() !== 'GET') invalidateCaches();
   return data;
 }
 
@@ -774,6 +796,7 @@ async function apiUpload(formData) {
   let data = null;
   try { data = await res.json(); } catch (e) { /* ignore */ }
   if (!res.ok) throw new Error((data && data.message) || '上传失败');
+  invalidateCaches();
   return data;
 }
 
@@ -2700,12 +2723,17 @@ async function renderMedia(container) {
           e.stopPropagation();
           const ok = await confirmModal('删除确认', '确定删除这张图片吗？此操作不可恢复。', true);
           if (!ok) return;
+          const btn = e.currentTarget;
+          btn.disabled = true;
           try {
             await api(`/api/media/${encodeURIComponent(rel)}`, { method: 'DELETE' });
-            toast('已删除', 'ok');
+            // 先从界面移除，避免列表刷新延迟造成"删不掉"的错觉
+            item.remove();
+            toast(MODE === 'github' ? '已从仓库删除（1~2 分钟后自动部署生效）' : '已删除', 'ok', 3200);
             load();
           } catch (err) {
-            toast(err.message, 'error');
+            btn.disabled = false;
+            toast(err.message, 'error', 4200);
           }
         });
       });

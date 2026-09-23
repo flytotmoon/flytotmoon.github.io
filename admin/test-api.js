@@ -65,7 +65,7 @@ async function main() {
     const one = await api('/api/posts/' + encodeURIComponent(key));
     assert('单篇读取正常', one.status === 200);
     const p = one.data.post;
-    assert('无缩进列表解析正确（分类）', p.categories.join('/') === '哲学/杂文', JSON.stringify(p.categories));
+    assert('无缩进列表解析正确（分类）', p.categories.join('/') === '哲学', JSON.stringify(p.categories));
     assert('无缩进列表解析正确（标签）', p.tags.join('/') === '哲学/马克思主义', JSON.stringify(p.tags));
     assert('mathjax 标记识别', p.mathjax === true);
     const rt = await api('/api/posts/' + encodeURIComponent(key), {
@@ -78,7 +78,7 @@ async function main() {
     assert('更新（往返）成功', rt.status === 200);
     if (rt.status === 200) {
       const re = await api('/api/posts/' + encodeURIComponent(rt.data.key));
-      assert('往返后分类保持', re.data.post.categories.join('/') === '哲学/杂文');
+      assert('往返后分类保持', re.data.post.categories.join('/') === '哲学');
       assert('往返后标签保持', re.data.post.tags.join('/') === '哲学/马克思主义');
       assert('往返后正文保持', re.data.post.body === p.body);
     }

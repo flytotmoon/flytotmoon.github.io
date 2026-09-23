@@ -9,8 +9,8 @@
   essay_list:
     - content: 又加强了一下博客后台。
       date: 2026/09/23
-      # image:
-      #   - https://图片地址（图片请用列表格式，一行一个）
+      image:
+        - https://xsxtk.oss-cn-beijing.aliyuncs.com/img/202609/20260923-1baddbf9-109951165462057650.jpg
     - content: 前天去了贺兰山的滚钟口。
       date: 2026/09/06
       image:

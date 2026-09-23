@@ -71,8 +71,39 @@
 
   /* ------------------------------ 阿里云 OSS ------------------------------ */
 
+  /**
+   * 归一化 OSS Endpoint，容忍常见填法：
+   *   oss-cn-beijing                        → oss-cn-beijing.aliyuncs.com
+   *   https://oss-cn-beijing.aliyuncs.com/  → oss-cn-beijing.aliyuncs.com
+   *   xsxtk.oss-cn-beijing.aliyuncs.com     → oss-cn-beijing.aliyuncs.com（误把 Bucket 带进来）
+   */
+  function normalizeEndpoint(endpoint, bucket) {
+    let e = String(endpoint || '').trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+    if (!e) return '';
+    const b = String(bucket || '').trim();
+    if (b && e.toLowerCase().startsWith(`${b.toLowerCase()}.`)) e = e.slice(b.length + 1);
+    if (!e.includes('.')) return `${e}.aliyuncs.com`;
+    if (/^oss-[a-z0-9-]+$/i.test(e.split('.')[0]) && !/\.aliyuncs\.com(\.cn)?$/i.test(e)) return `${e}.aliyuncs.com`;
+    return e;
+  }
+
+  /** 统一的网络错误提示：把浏览器的 "Failed to fetch" 翻译成可排查的原因 */
+  async function fetchOrExplain(url, opts) {
+    try {
+      return await fetch(url, opts);
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      const host = String(url).replace(/^https?:\/\//, '').split('/')[0];
+      if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+        throw new Error(`无法连接 ${host}：可能是 Bucket 未配置跨域(CORS)、Endpoint 填错或本机网络不通。`
+          + '浏览器直传 OSS 需在 OSS 控制台给 Bucket 添加跨域规则（来源填站点域名、方法 PUT/POST/GET/HEAD/DELETE、允许 Headers 全部）。');
+      }
+      throw new Error(`请求 ${host} 失败：${msg || '未知网络错误'}`);
+    }
+  }
+
   function ossHost(cfg) {
-    const endpoint = String(cfg.endpoint || '').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const endpoint = normalizeEndpoint(cfg.endpoint, cfg.bucket);
     return `${cfg.bucket}.${endpoint}`;
   }
 
@@ -94,7 +125,7 @@
     const date = new Date().toUTCString();
     const resource = `/${cfg.bucket}/${key}`;
     const auth = await ossSign(cfg, 'PUT', contentType || 'application/octet-stream', date, resource);
-    const res = await fetch(`https://${ossHost(cfg)}/${encodeKeyPath(key)}`, {
+    const res = await fetchOrExplain(`https://${ossHost(cfg)}/${encodeKeyPath(key)}`, {
       method: 'PUT',
       headers: {
         Date: date,
@@ -128,7 +159,7 @@
     for (const resource of resources) {
       const date = new Date().toUTCString();
       const auth = await ossSign(cfg, 'GET', '', date, resource);
-      const res = await fetch(`https://${ossHost(cfg)}/?${query}`, {
+      const res = await fetchOrExplain(`https://${ossHost(cfg)}/?${query}`, {
         method: 'GET',
         headers: { Date: date, Authorization: auth },
       });
@@ -166,7 +197,7 @@
     const date = new Date().toUTCString();
     const resource = `/${cfg.bucket}/${key}`;
     const auth = await ossSign(cfg, 'DELETE', '', date, resource);
-    const res = await fetch(`https://${ossHost(cfg)}/${encodeKeyPath(key)}`, {
+    const res = await fetchOrExplain(`https://${ossHost(cfg)}/${encodeKeyPath(key)}`, {
       method: 'DELETE',
       headers: { Date: date, Authorization: auth },
     });
@@ -203,7 +234,7 @@
     (cfg.headers || []).forEach((h) => {
       if (h && h.name) headers[h.name] = h.value;
     });
-    const res = await fetch(cfg.uploadUrl, { method: 'POST', headers, body: fd });
+    const res = await fetchOrExplain(cfg.uploadUrl, { method: 'POST', headers, body: fd });
     const text = await res.text().catch(() => '');
     if (!res.ok) throw new Error(`自定义图床上传失败：HTTP ${res.status} ${text.slice(0, 180)}`);
     const url = extractUrl(text, cfg.urlRegex);
@@ -264,6 +295,8 @@
     buildFileName,
     joinPrefix,
     extractUrl,
+    normalizeEndpoint,
+    ossHost,
     ossPublicUrl,
     ossPut,
     ossList,

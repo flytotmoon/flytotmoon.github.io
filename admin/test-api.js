@@ -199,6 +199,17 @@ async function main() {
   const stBack = await api('/api/storage', { method: 'PUT', body: JSON.stringify({ backend: 'github', oss: stGet.data.storage.oss }) });
   assert('图床切回 GitHub 仓库', stBack.status === 200 && stBack.data.storage.backend === 'github');
 
+  // Endpoint / 目录前缀容错归一化
+  const stSloppy = await api('/api/storage', {
+    method: 'PUT',
+    body: JSON.stringify({ backend: 'github', oss: { accessKeyId: 'ak', accessKeySecret: 'sk', bucket: 'xsxtk', endpoint: 'https://xsxtk.oss-cn-beijing/', dirPrefix: '/img/', customDomain: 'https://img.example.com/' } }),
+  });
+  assert('Endpoint 自动补全/纠错', stSloppy.data.storage.oss.endpoint === 'oss-cn-beijing.aliyuncs.com', stSloppy.data.storage.oss.endpoint);
+  assert('目录前缀去除首尾斜杠', stSloppy.data.storage.oss.dirPrefix === 'img', stSloppy.data.storage.oss.dirPrefix);
+  assert('自定义域名去掉尾部斜杠', stSloppy.data.storage.oss.customDomain === 'https://img.example.com', stSloppy.data.storage.oss.customDomain);
+  const stRestore = await api('/api/storage', { method: 'PUT', body: JSON.stringify({ backend: 'github', oss: stGet.data.storage.oss }) });
+  assert('恢复原始图床配置', stRestore.status === 200 && stRestore.data.storage.oss.endpoint === stGet.data.storage.oss.endpoint);
+
   // ---- 统一上传入口 + 云相册 ----
   const fd2 = new FormData();
   fd2.append('file', new Blob([png], { type: 'image/png' }), 'gallery-test.png');
@@ -226,6 +237,14 @@ async function main() {
   assert('目录拼接去掉多余斜杠', StorageMod.joinPrefix('/img/upload/', '/202601/x.png') === 'img/upload/202601/x.png', StorageMod.joinPrefix('/img/upload/', '/202601/x.png'));
   assert('URL 提取（自定义正则）', StorageMod.extractUrl('{"data":{"url":"https://cdn.x.com/a.png"}}', '"url"\\s*:\\s*"(.*?)"') === 'https://cdn.x.com/a.png');
   assert('URL 提取（默认第一个链接）', StorageMod.extractUrl('{"link":"https://cdn.x.com/b.jpg"}') === 'https://cdn.x.com/b.jpg');
+
+  // Endpoint 归一化（常见错误写法）
+  const ep = StorageMod.normalizeEndpoint;
+  assert('Endpoint：只填 region 自动补全', ep('oss-cn-beijing', 'xsxtk') === 'oss-cn-beijing.aliyuncs.com', ep('oss-cn-beijing', 'xsxtk'));
+  assert('Endpoint：带协议和斜杠被清理', ep('https://oss-cn-hangzhou.aliyuncs.com/', 'b') === 'oss-cn-hangzhou.aliyuncs.com', ep('https://oss-cn-hangzhou.aliyuncs.com/', 'b'));
+  assert('Endpoint：误带 Bucket 前缀被去掉', ep('xsxtk.oss-cn-beijing.aliyuncs.com', 'xsxtk') === 'oss-cn-beijing.aliyuncs.com', ep('xsxtk.oss-cn-beijing.aliyuncs.com', 'xsxtk'));
+  assert('Endpoint：完整域名原样保留', ep('oss-cn-beijing.aliyuncs.com', 'xsxtk') === 'oss-cn-beijing.aliyuncs.com');
+  assert('Endpoint：空值返回空串', ep('', 'xsxtk') === '');
 
   // 自定义图床：上传到本地 mock 服务
   const mock = httpMod.createServer((req, res) => {

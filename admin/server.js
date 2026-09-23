@@ -959,9 +959,13 @@ async function handleApi(req, res, urlObj, user) {
       custom: Object.assign({}, def.custom, body.custom || {}),
     };
     if (!Array.isArray(next.custom.headers)) next.custom.headers = [];
+    // Endpoint / 目录前缀归一化，容忍只填 region、带协议或误带 Bucket 的写法
+    next.oss.endpoint = Storage.normalizeEndpoint(next.oss.endpoint, next.oss.bucket) || def.oss.endpoint;
+    next.oss.dirPrefix = String(next.oss.dirPrefix || '').replace(/^\/+|\/+$/g, '');
+    next.oss.customDomain = String(next.oss.customDomain || '').replace(/\/+$/, '');
     cfg.storage = next;
     saveConfig();
-    log(`已更新图床配置：${next.backend}`);
+    log(`已更新图床配置：${next.backend}${next.backend === 'oss' ? `（${next.oss.bucket}.${next.oss.endpoint}）` : ''}`);
     return sendJSON(res, 200, { ok: true, storage: next, message: '图床配置已保存' });
   }
 

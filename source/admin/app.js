@@ -2865,6 +2865,7 @@ function mediaSettingsHTML() {
         <label class="field"><span>存储目录前缀</span><input id="st-oss-prefix" value="${esc(oss.dirPrefix || '')}" placeholder="img/upload" /></label>
         <label class="field"><span>自定义域名 / CDN（可选）</span><input id="st-oss-domain" value="${esc(oss.customDomain || '')}" placeholder="https://img.example.com" /></label>
       </div>
+      <p class="hint">Endpoint 填 <code>oss-cn-beijing.aliyuncs.com</code> 这种完整形式（只填 <code>oss-cn-beijing</code> 保存时会自动补全，带 <code>https://</code> 或误带 Bucket 前缀也会自动纠正）。目录前缀填 <code>img/upload</code> 或与现有图片一致的 <code>img</code>。</p>
       ${corsTip}
       <p class="hint">填成与博客现有图片相同的 Bucket 就能统一管理，例如 Bucket <code>xsxtk</code> + Endpoint <code>oss-cn-beijing.aliyuncs.com</code>。密钥只保存在本机 / 本浏览器，不会写进仓库。</p>
     </div>
@@ -3152,9 +3153,9 @@ async function renderMedia(container) {
         accessKeyId: $('#st-oss-key').value.trim(),
         accessKeySecret: $('#st-oss-secret').value.trim(),
         bucket: $('#st-oss-bucket').value.trim(),
-        endpoint: $('#st-oss-endpoint').value.trim() || 'oss-cn-beijing.aliyuncs.com',
-        dirPrefix: $('#st-oss-prefix').value.trim(),
-        customDomain: $('#st-oss-domain').value.trim(),
+        endpoint: FTMStorage.normalizeEndpoint($('#st-oss-endpoint').value, $('#st-oss-bucket').value) || 'oss-cn-beijing.aliyuncs.com',
+        dirPrefix: $('#st-oss-prefix').value.trim().replace(/^\/+|\/+$/g, ''),
+        customDomain: $('#st-oss-domain').value.trim().replace(/\/+$/, ''),
       },
       custom: {
         uploadUrl: $('#st-cu-url').value.trim(),

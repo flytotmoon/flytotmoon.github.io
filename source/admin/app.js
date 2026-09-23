@@ -2730,16 +2730,37 @@ async function renderEssay(container) {
     toast(e.message, 'error');
   }
 
-  // 添加新条目：在文末追加模板
+  // 添加新条目：插入到列表最前面
+  // 主题按文件顺序渲染 essay_list（index < limit），放在最前面即最新在最上面，也不会被 limit 截断
   $('#essay-add').addEventListener('click', () => {
     const d = new Date();
     const p = (n) => String(n).padStart(2, '0');
     const today = `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())}`;
-    const tpl = `\n    - content: 写点什么吧…\n      date: ${today}\n      # image:\n      #   - https://图片地址（图片请用列表格式，一行一个）\n`;
-    ta.value = ta.value.replace(/\s*$/, '') + tpl;
+    const placeholder = '写点什么吧…';
+    const block = `    - content: ${placeholder}\n      date: ${today}\n      # image:\n      #   - https://图片地址（图片请用列表格式，一行一个）`;
+
+    const lines = ta.value.split('\n');
+    // 锚点：第一个 essay_list: 之后；没有该行则插到第一条条目之前；都没有就追加到文末
+    const listIdx = lines.findIndex((l) => /^\s*essay_list:\s*$/.test(l));
+    const entryIdx = listIdx === -1 ? lines.findIndex((l) => /^\s{4}-\s+content:/.test(l)) : -1;
+    const insertAt = listIdx !== -1 ? listIdx + 1 : entryIdx;
+    if (insertAt !== -1) {
+      lines.splice(insertAt, 0, ...block.split('\n'));
+      ta.value = lines.join('\n');
+    } else {
+      ta.value = ta.value.replace(/\s*$/, '') + (ta.value.trim() ? '\n' : '') + block + '\n';
+    }
     renderPreview();
-    ta.scrollTop = ta.scrollHeight;
-    toast('已在末尾添加新条目，替换文字后保存即可', 'ok');
+
+    // 选中占位文字，直接输入即可覆盖
+    const pos = ta.value.indexOf(placeholder);
+    if (pos !== -1) {
+      ta.focus();
+      ta.setSelectionRange(pos, pos + placeholder.length);
+      const lineNo = ta.value.slice(0, pos).split('\n').length - 1;
+      ta.scrollTop = Math.max(0, (lineNo - 6) * 21);
+    }
+    toast('已在最前面插入新条目，替换文字后保存即可', 'ok');
   });
 
   // 保存

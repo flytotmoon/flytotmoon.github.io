@@ -302,7 +302,8 @@ async function main() {
     assert('OSS 公共访问地址正确', ossOut.url === `https://bkt.oss-cn-beijing.aliyuncs.com/${ossOut.key}`, ossOut.url);
     assert('OSS 自定义域名优先生效', StorageMod.ossPublicUrl({ bucket: 'bkt', endpoint: 'oss-cn-beijing.aliyuncs.com', customDomain: 'https://img.example.com/' }, 'a/b.png') === 'https://img.example.com/a/b.png');
 
-    // 签名变体自动重试：首次 SignatureDoesNotMatch → 第二次改用不计入 x-oss-date 的算法
+    // 签名变体自动重试：首次 SignatureDoesNotMatch（响应里未给期望串）→ 换算法重试
+    StorageMod.resetOssProfile();
     reqs = [];
     global.fetch = async (url, opts) => {
       reqs.push({ url, opts });
@@ -311,12 +312,13 @@ async function main() {
         : { ok: true, status: 200, text: async () => '' };
     };
     const fbOut = await StorageMod.upload({ backend: 'oss', oss: ossCfg }, { filename: 'b.png', contentType: 'image/png', bytes: png });
-    assert('签名不匹配时自动重试一次', reqs.length === 2, reqs.length);
+    assert('签名不匹配时自动换算法重试', reqs.length === 2, reqs.length);
     const d2 = reqs[1].opts.headers['x-oss-date'];
     const expect2 = 'OSS ak:' + cryptoMod.createHmac('sha1', 'sk').update(`PUT\n\nimage/png\n${d2}\n/bkt/${fbOut.key}`).digest('base64');
     assert('重试改用不计入 x-oss-date 的签名', reqs[1].opts.headers.Authorization === expect2, reqs[1].opts.headers.Authorization);
 
     // 签名正确但服务端 403（如权限不足）时不应无限重试
+    StorageMod.resetOssProfile();
     reqs = [];
     global.fetch = async (url, opts) => {
       reqs.push({ url, opts });
@@ -358,6 +360,38 @@ async function main() {
     assert('monthDir=true 按月建子目录', /^img\/\d{6}\/\d{8}-[0-9a-f]{8}-m\.png$/.test(monthly.key), monthly.key);
     const flat = await StorageMod.upload({ backend: 'oss', oss: Object.assign({}, ossCfg, { dirPrefix: 'img', monthDir: false }) }, { filename: 'f.png', contentType: 'image/png', bytes: png });
     assert('monthDir=false 平铺在同一层', /^img\/\d{8}-[0-9a-f]{8}-f\.png$/.test(flat.key), flat.key);
+
+    // 签名约定自适应：OSS 返回它期望的签名串时，直接用它重签重放并学习该约定
+    StorageMod.resetOssProfile();
+    reqs = [];
+    let phase = 0;
+    global.fetch = async (url, opts) => {
+      reqs.push({ url, opts });
+      const d = opts.headers['x-oss-date'];
+      if (phase === 0) {
+        phase = 1;
+        const expected = `GET\n\n\n${d}\nx-oss-date:${d}\n/bkt/?prefix=img%2F`;
+        return { ok: false, status: 403, text: async () => `<Error><Code>SignatureDoesNotMatch</Code><StringToSign>${expected}</StringToSign></Error>` };
+      }
+      return { ok: true, status: 200, text: async () => listXml(['img/x.jpg'], false) };
+    };
+    const learnedGal = await StorageMod.list({ backend: 'oss', oss: Object.assign({}, ossCfg, { dirPrefix: 'img' }) }, 2000);
+    const d0 = reqs[0].opts.headers['x-oss-date'];
+    const expSig = 'OSS ak:' + cryptoMod.createHmac('sha1', 'sk').update(`GET\n\n\n${d0}\nx-oss-date:${d0}\n/bkt/?prefix=img%2F`).digest('base64');
+    assert('用 OSS 期望串重签重放成功', learnedGal.length === 1 && reqs.length === 2, `${learnedGal.length} 张 / ${reqs.length} 次`);
+    assert('重放签名等于 OSS 期望串的签名', reqs[1].opts.headers.Authorization === expSig, reqs[1].opts.headers.Authorization);
+
+    reqs = [];
+    await StorageMod.list({ backend: 'oss', oss: Object.assign({}, ossCfg, { dirPrefix: 'img' }) }, 2000);
+    const d1 = reqs[0] ? reqs[0].opts.headers['x-oss-date'] : '';
+    const expSig2 = 'OSS ak:' + cryptoMod.createHmac('sha1', 'sk').update(`GET\n\n\n${d1}\nx-oss-date:${d1}\n/bkt/?prefix=img%2F`).digest('base64');
+    assert('学习后一次请求即成功并沿用该约定', reqs.length === 1 && reqs[0].opts.headers.Authorization === expSig2, `${reqs.length} 次`);
+
+    // 本机串与 OSS 期望串一致 → 明确提示是密钥问题
+    const same = 'GET\n\n\nD\nx-oss-date:D\n/bkt/?prefix=img%2F';
+    const keyHint = StorageMod.explainOssError(403, `<Error><Code>SignatureDoesNotMatch</Code><StringToSign>${same}</StringToSign></Error>`, same);
+    assert('签名串一致时提示 AccessKey 问题', /是 AccessKey 不对/.test(keyHint), keyHint);
+    StorageMod.resetOssProfile();
   } finally {
     global.fetch = realFetch;
   }

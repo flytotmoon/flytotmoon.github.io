@@ -1426,6 +1426,27 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
 .picgo-loading { grid-column: 1 / -1; padding: 36px; text-align: center; color: var(--muted); font-size: 13px; }
 .picgo-more { grid-column: 1 / -1; justify-self: center; margin-top: 6px; }
 
+.picgo-error {
+  margin-top: 14px;
+  border: 1px solid #f3c9c9;
+  background: #fff7f7;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.picgo-error-head { display: flex; align-items: center; gap: 8px; color: var(--danger); font-size: 13px; }
+.picgo-error-head b { margin-right: auto; }
+.picgo-error-text {
+  margin: 10px 0 0;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #7a2222;
+  font-family: "JetBrains Mono", Consolas, monospace;
+}
+
 .picgo-recent-head { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; display: flex; gap: 6px; align-items: center; }
 .picgo-recent-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; }
 .picgo-recent-item {

@@ -2937,6 +2937,7 @@ async function renderMedia(container) {
             </label>
             <span class="hint" style="margin:0">图片存入「${esc(info.name)}」，上传成功即可直接粘贴到文章里</span>
           </div>
+          <div class="picgo-error hidden" id="media-error"></div>
         </div>
       </div>
 
@@ -2967,6 +2968,27 @@ async function renderMedia(container) {
   let keyword = '';
   let shown = PAGE_SIZE;
   let galleryTruncated = false;
+
+  /* ---------- 错误详情（完整显示 + 可复制，避免 toast 截断） ---------- */
+
+  const showError = (msg) => {
+    const box = $('#media-error');
+    if (!box) return;
+    if (!msg) {
+      box.classList.add('hidden');
+      box.innerHTML = '';
+      return;
+    }
+    box.classList.remove('hidden');
+    box.innerHTML = `<div class="picgo-error-head">
+        <b>操作失败</b>
+        <button class="btn btn-ghost btn-sm" id="media-error-copy">复制诊断信息</button>
+        <button class="btn btn-ghost btn-sm" id="media-error-close">关闭</button>
+      </div>
+      <pre class="picgo-error-text">${esc(msg)}</pre>`;
+    $('#media-error-copy').addEventListener('click', () => copyText(msg));
+    $('#media-error-close').addEventListener('click', () => showError(''));
+  };
 
   /* ---------- 相册列表 ---------- */
 
@@ -3054,11 +3076,13 @@ async function renderMedia(container) {
       items = (data.files || []).map(normalizeGalleryFile);
       galleryTruncated = Boolean(data.truncated) || (data.files || []).length >= (data.limit || 2000);
       shown = PAGE_SIZE;
+      showError('');
       renderGrid();
     } catch (e) {
       items = [];
       galleryTruncated = false;
-      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">读取失败：${esc(e.message)}</div>`;
+      showError(e.message);
+      grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">读取失败，完整原因见上方「操作失败」面板</div>';
     }
   };
 
@@ -3116,7 +3140,13 @@ async function renderMedia(container) {
         });
         toast(`${label} 上传成功`, 'ok');
       } catch (e) {
-        toast(`${label} 上传失败：${e.message}`, 'error', 6000);
+        const msg = String(e.message || e);
+        if (msg.length > 140) {
+          showError(`${label} 上传失败：\n${msg}`);
+          toast(`${label} 上传失败，详细原因见上方面板`, 'error', 5000);
+        } else {
+          toast(`${label} 上传失败：${msg}`, 'error', 6000);
+        }
       }
       done += 1;
       $('#media-progress-inner').style.width = `${Math.round((done / list.length) * 100)}%`;

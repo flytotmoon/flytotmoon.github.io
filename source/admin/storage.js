@@ -53,17 +53,6 @@
       .join('&');
   }
 
-  /**
-   * CanonicalizedResource 的子资源串：键按字典序升序
-   * 签名时子资源值要用原值（与 ali-oss 一致），encodeValues=true 时用编码值
-   */
-  function buildOssResource(bucket, params, encodeValues) {
-    const sub = Object.keys(params).sort()
-      .map((k) => `${k}=${encodeValues ? encodeURIComponent(params[k]) : params[k]}`)
-      .join('&');
-    return `/${bucket}/?${sub}`;
-  }
-
   /** 生成上传文件名：YYYYMMDD-随机-名字.ext */
   function buildFileName(originalName) {
     const d = new Date();
@@ -157,10 +146,16 @@
     const message = (/<Message>([\s\S]*?)<\/Message>/.exec(text) || [])[1] || '';
     const requestId = (/<RequestId>([\s\S]*?)<\/RequestId>/.exec(text) || [])[1] || '';
     if (code === 'SignatureDoesNotMatch' && ours) {
-      const expected = (/<StringToSign>([\s\S]*?)<\/StringToSign>/.exec(text) || [])[1] || '';
+      const expected = extractStringToSign(text);
+      if (expected && expected === ours) {
+        return `OSS 签名不匹配（HTTP ${status}）
+· 本机签名串与 OSS 期望串完全一致 → 签名算法没问题，是 AccessKey 不对
+· 请重新复制 AccessKey Secret（30 位、无空格换行），并确认它与 AccessKey ID 属于同一账号且未被禁用
+· 签名串：${JSON.stringify(ours)}${requestId ? `\n· RequestId：${requestId}` : ''}`;
+      }
       return `OSS 签名不匹配（HTTP ${status}）
 · 本机签名串：${JSON.stringify(ours)}
-${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 请重点检查 AccessKey Secret 是否复制完整（应为 30 位、无空格换行），以及它与 AccessKey ID 是否属于同一个账号${requestId ? `\n· RequestId：${requestId}` : ''}`;
+${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 两者不一致时多为子资源/编码约定差异（已自动重试），请把这两行发给开发者；若完全一致则说明 AccessKey Secret 不正确${requestId ? `\n· RequestId：${requestId}` : ''}`;
     }
     return `OSS 请求失败：HTTP ${status} ${code ? `<${code}> ` : ''}${message || text.slice(0, 200)}${requestId ? `（RequestId ${requestId}）` : ''}`;
   }
@@ -184,26 +179,104 @@ ${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 请重�
     return `OSS ${cfg.accessKeyId}:${sig}`;
   }
 
+  /* ------------------------------ OSS 签名约定自适应 ------------------------------ */
+
   /**
-   * 发送一次 OSS 请求；若 OSS 返回 SignatureDoesNotMatch，则自动换一种
-   * 「x-oss-date 是否计入签名头」的算法重试（不同实现/区域存在差异）。
+   * CanonicalizedResource 的候选形式。
+   * 不同实现/区域对「哪些子资源参与签名」「值用原文还是 URL 编码」存在差异，
+   * 这里列出可能的组合，由 OSS 返回的期望签名串来选定。
    */
-  async function ossSend(cfg, { method, url, resource, contentType = '', body }) {
-    let out = null;
-    for (const includeOssHeaders of [true, false]) {
-      const date = new Date().toUTCString();
-      const ossHeaders = includeOssHeaders ? `x-oss-date:${date}\n` : '';
-      const stringToSign = `${method}\n\n${contentType}\n${date}\n${ossHeaders}${resource}`;
-      const sig = await hmacSha1Base64(cfg.accessKeySecret, stringToSign);
-      const headers = { 'x-oss-date': date, Authorization: `OSS ${cfg.accessKeyId}:${sig}` };
-      if (contentType) headers['Content-Type'] = contentType;
-      const res = await fetchOrExplain(url, { method, headers, body });
-      const text = await res.text().catch(() => '');
-      out = { res, text, stringToSign };
-      if (res.ok || !/SignatureDoesNotMatch/i.test(text)) return out;
-    }
-    return out;
+  const OSS_RESOURCE_FORMS = [
+    { id: 'all-raw', encode: false, maxKeys: true },
+    { id: 'all-enc', encode: true, maxKeys: true },
+    { id: 'signed-raw', encode: false, maxKeys: false },
+    { id: 'signed-enc', encode: true, maxKeys: false },
+  ];
+
+  /** 已探测到的签名约定（同一会话内复用，避免每次多一次往返） */
+  let ossProfile = null;
+
+  function ossParamsSuffix(form, params) {
+    const keys = Object.keys(params || {}).filter((k) => form.maxKeys || k !== 'max-keys').sort();
+    if (!keys.length) return '';
+    return `?${keys.map((k) => `${k}=${form.encode ? encodeURIComponent(params[k]) : params[k]}`).join('&')}`;
   }
+
+  /** 从 OSS 的错误响应里取出它期望的签名串 */
+  function extractStringToSign(xml) {
+    const text = String(xml || '');
+    const direct = (/<StringToSign>([\s\S]*?)<\/StringToSign>/.exec(text) || [])[1];
+    if (direct) return direct;
+    const hex = (/<StringToSignBytes>([\s\S]*?)<\/StringToSignBytes>/.exec(text) || [])[1];
+    if (!hex) return '';
+    const bytes = hex.trim().split(/\s+/).map((h) => parseInt(h, 16)).filter((n) => !Number.isNaN(n));
+    let out = '';
+    for (const b of bytes) out += String.fromCharCode(b);
+    try { return decodeURIComponent(escape(out)); } catch (e) { return out; }
+  }
+
+  /** 用 OSS 期望串反推它采用的约定 */
+  function learnOssProfile(expected, base, params) {
+    const idx = expected.lastIndexOf('\n');
+    const resource = expected.slice(idx + 1);
+    const ossHeaders = /(^|\n)x-oss-date:/i.test(expected);
+    const form = OSS_RESOURCE_FORMS.find((f) => resource === base + ossParamsSuffix(f, params));
+    return form ? { form: form.id, ossHeaders } : null;
+  }
+
+  /** 用给定的签名串发一次请求 */
+  async function ossSendSigned(cfg, method, url, stringToSign, contentType, body, stamp) {
+    const date = stamp || new Date().toUTCString();
+    const sig = await hmacSha1Base64(cfg.accessKeySecret, stringToSign);
+    const headers = { 'x-oss-date': date, Authorization: `OSS ${cfg.accessKeyId}:${sig}` };
+    if (contentType) headers['Content-Type'] = contentType;
+    const res = await fetchOrExplain(url, { method, headers, body });
+    const text = await res.text().catch(() => '');
+    return { res, text, stringToSign, date };
+  }
+
+  /**
+   * 发送 OSS 请求：
+   * 1) 先用已学习到（或默认）的约定签名
+   * 2) 若 OSS 报 SignatureDoesNotMatch，就用它响应里给出的期望签名串重签并重放，
+   *    同时从中学习该区域的约定，后续请求即可一次成功
+   */
+  async function ossSend(cfg, { method, url, base, params = {}, contentType = '', body }) {
+    const forms = OSS_RESOURCE_FORMS;
+    const plan = [];
+    if (ossProfile) {
+      plan.push({ form: forms.find((f) => f.id === ossProfile.form) || forms[0], ossHeaders: ossProfile.ossHeaders });
+    } else {
+      // 先按 x-oss-date 是否计入签名头切换（对象请求只与这一维有关），再换子资源形式
+      forms.forEach((f) => [true, false].forEach((ossHeaders) => plan.push({ form: f, ossHeaders })));
+    }
+
+    const attempted = [];
+    for (const step of plan) {
+      const date = new Date().toUTCString();
+      const resource = base + ossParamsSuffix(step.form, params);
+      const sts = `${method}\n\n${contentType}\n${date}\n${step.ossHeaders ? `x-oss-date:${date}\n` : ''}${resource}`;
+      const out = await ossSendSigned(cfg, method, url, sts, contentType, body, date);
+      attempted.push(sts);
+      if (out.res.ok) { ossProfile = { form: step.form.id, ossHeaders: step.ossHeaders }; return out; }
+      if (!/SignatureDoesNotMatch/i.test(out.text)) return out;
+
+      const expected = extractStringToSign(out.text);
+      // 期望串与我们所签完全一致 → 算法没问题，是密钥不对，不必再试其它组合
+      if (expected && expected === sts) return out;
+
+      if (expected) {
+        const replay = await ossSendSigned(cfg, method, url, expected, contentType, body, out.date);
+        if (replay.res.ok) {
+          ossProfile = learnOssProfile(expected, base, params) || ossProfile;
+          return replay;
+        }
+        if (!/SignatureDoesNotMatch/i.test(replay.text)) return replay;
+      }
+    }
+    return { res: { ok: false, status: 403 }, text: '', stringToSign: attempted[attempted.length - 1] || '' };
+  }
+
 
   /** 上传对象到 OSS */
   async function ossPut(cfg, key, bytes, contentType) {
@@ -211,7 +284,7 @@ ${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 请重�
     const { res, text, stringToSign } = await ossSend(cfg, {
       method: 'PUT',
       url: `https://${ossHost(cfg)}/${encodeKeyPath(key)}`,
-      resource: `/${cfg.bucket}/${key}`,
+      base: `/${cfg.bucket}/${key}`,
       contentType: type,
       body: bytes,
     });
@@ -221,9 +294,8 @@ ${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 请重�
 
   /**
    * 列出 OSS 对象（ListObjects V1，自动翻页取全）
-   * - 子资源按字典序排序；URL 用编码值、签名用原值（与 ali-oss 官方实现一致），
-   *   若 OSS 返回 SignatureDoesNotMatch 则换另一种编码方式重试
    * - V1 不带 delimiter 时不返回 NextMarker，用本页最后一个 Key 作为下一页的 marker
+   * - 子资源串的编码方式/是否含 max-keys 由 ossSend 自适应（见 OSS_RESOURCE_FORMS）
    * @param {string} prefix 目录前缀，非空时按目录语义补 `/`（img → img/）
    */
   async function ossList(cfg, prefix, max) {
@@ -240,22 +312,15 @@ ${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 请重�
       const params = { 'max-keys': Math.min(1000, limit - files.length) };
       if (dir) params.prefix = dir;
       if (marker) params.marker = marker;
-      const query = buildOssQuery(params);
-      const url = `https://${ossHost(cfg)}/?${query}`;
+      const url = `https://${ossHost(cfg)}/?${buildOssQuery(params)}`;
 
-      let out = null;
-      let lastErr = '';
-      for (const encodeValues of [false, true]) {
-        out = await ossSend(cfg, {
-          method: 'GET',
-          url,
-          resource: buildOssResource(cfg.bucket, params, encodeValues),
-        });
-        if (out.res.ok) { lastErr = ''; break; }
-        lastErr = explainOssError(out.res.status, out.text, out.stringToSign);
-        if (!/SignatureDoesNotMatch/i.test(out.text)) break;
-      }
-      if (lastErr) throw new Error(lastErr);
+      const out = await ossSend(cfg, {
+        method: 'GET',
+        url,
+        base: `/${cfg.bucket}/`,
+        params,
+      });
+      if (!out.res.ok) throw new Error(explainOssError(out.res.status, out.text, out.stringToSign));
 
       const text = out.text;
       let lastKey = '';
@@ -297,7 +362,7 @@ ${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 请重�
     const { res, text, stringToSign } = await ossSend(cfg, {
       method: 'DELETE',
       url: `https://${ossHost(cfg)}/${encodeKeyPath(key)}`,
-      resource: `/${cfg.bucket}/${key}`,
+      base: `/${cfg.bucket}/${key}`,
     });
     if (!res.ok && res.status !== 404) throw new Error(explainOssError(res.status, text, stringToSign));
     return true;
@@ -394,6 +459,9 @@ ${expected ? `· OSS 期望串：${JSON.stringify(expected)}\n` : ''}· 请重�
     normalizeEndpoint,
     sanitizeOss,
     explainOssError,
+    extractStringToSign,
+    learnOssProfile,
+    resetOssProfile() { ossProfile = null; },
     ossHost,
     ossPublicUrl,
     ossPut,

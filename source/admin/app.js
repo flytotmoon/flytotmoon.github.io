@@ -114,6 +114,47 @@ function saveGH() {
   localStorage.setItem('ftm_mode', MODE);
 }
 
+/* ------------------------------ 图床（云相册）配置 ------------------------------ */
+
+const DEFAULT_STORAGE_CFG = {
+  backend: 'github', // github | oss | custom
+  oss: {
+    accessKeyId: '',
+    accessKeySecret: '',
+    bucket: '',
+    endpoint: 'oss-cn-beijing.aliyuncs.com',
+    dirPrefix: 'img/upload',
+    customDomain: '',
+  },
+  custom: { uploadUrl: '', fieldName: 'file', headers: [], urlRegex: '' },
+};
+
+let STORAGE = JSON.parse(JSON.stringify(DEFAULT_STORAGE_CFG));
+try {
+  const saved = JSON.parse(localStorage.getItem('ftm_storage') || 'null');
+  if (saved) STORAGE = Object.assign(STORAGE, saved, { oss: Object.assign({}, STORAGE.oss, saved.oss || {}), custom: Object.assign({}, STORAGE.custom, saved.custom || {}) });
+} catch (e) { /* ignore */ }
+
+function saveStorageCfg() {
+  localStorage.setItem('ftm_storage', JSON.stringify(STORAGE));
+}
+
+/** 本地上传记录（自定义图床无法列举时尤为有用） */
+function pushUploadRecord(rec) {
+  try {
+    const list = JSON.parse(localStorage.getItem('ftm_uploads') || '[]');
+    list.unshift(Object.assign({ time: Date.now() }, rec));
+    localStorage.setItem('ftm_uploads', JSON.stringify(list.slice(0, 60)));
+  } catch (e) { /* ignore */ }
+}
+function getUploadRecords() {
+  try {
+    return JSON.parse(localStorage.getItem('ftm_uploads') || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
 /* ------------------------------ GitHub REST 适配层 ------------------------------ */
 
 const GH_API = 'https://api.github.com';
@@ -568,6 +609,42 @@ async function githubApi(path, opts = {}) {
       }
     }
 
+    /* ---- 图床配置（浏览器本地保存） ---- */
+    if (p === '/api/storage' && method === 'GET') {
+      return wrap({ storage: STORAGE });
+    }
+    if (p === '/api/storage' && method === 'PUT') {
+      STORAGE = Object.assign(STORAGE, body, {
+        oss: Object.assign({}, STORAGE.oss, body.oss || {}),
+        custom: Object.assign({}, STORAGE.custom, body.custom || {}),
+      });
+      if (!Array.isArray(STORAGE.custom.headers)) STORAGE.custom.headers = [];
+      saveStorageCfg();
+      return wrap({ storage: STORAGE, message: '图床配置已保存（仅存于本浏览器）' });
+    }
+
+    /* ---- 云相册（按当前图床） ---- */
+    if (p === '/api/gallery' && method === 'GET') {
+      if ((STORAGE.backend || 'github') === 'github') {
+        return wrap({ backend: 'github', files: await ghListMedia() });
+      }
+      const files = await FTMStorage.list(STORAGE, 200);
+      return wrap({ backend: STORAGE.backend, files });
+    }
+    if (p === '/api/gallery' && method === 'DELETE') {
+      const key = q.get('key') || '';
+      if (!key) throw new Error('缺少 key 参数');
+      if ((STORAGE.backend || 'github') === 'github') {
+        const filePath = mediaDir + '/' + key;
+        const { sha } = await ghReadFile(filePath);
+        await ghDeleteFile(filePath, sha, `admin: 删除图片 ${key}`);
+        invalidateCaches();
+        return wrap({ message: '已从仓库删除' });
+      }
+      await FTMStorage.remove(STORAGE, key);
+      return wrap({ message: '已删除' });
+    }
+
     /* ---- 媒体 ---- */
     if (p === '/api/media' && method === 'GET') {
       return wrap({ files: await ghListMedia() });
@@ -782,10 +859,25 @@ async function api(path, opts = {}) {
 }
 
 async function apiUpload(formData) {
-  if (MODE === 'github') return githubUpload(formData);
+  // GitHub 云端模式：按图床配置在浏览器侧直接上传
+  if (MODE === 'github') {
+    const file = formData.get('file');
+    if (!file) throw new Error('未找到上传文件');
+    const backend = STORAGE.backend || 'github';
+    if (backend === 'github') return githubUpload(formData);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const out = await FTMStorage.upload(STORAGE, {
+      filename: file.name,
+      contentType: file.type || 'application/octet-stream',
+      bytes,
+    });
+    invalidateCaches();
+    return { ok: true, backend, name: out.key.split('/').pop(), key: out.key, url: out.url };
+  }
+  // 本机模式：交给服务端按图床配置上传
   let res;
   try {
-    res = await fetch('/api/media', {
+    res = await fetch('/api/upload', {
       method: 'POST',
       headers: TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {},
       body: formData,
@@ -1034,6 +1126,8 @@ const PAGE_TITLES = {
 };
 
 let lastRoute = null;
+/** 离开当前视图时需要解绑的事件（如媒体库的粘贴上传），由各视图自行登记 */
+let VIEW_CLEANUP = null;
 
 function parseHash() {
   const raw = location.hash.replace(/^#\/?/, '');
@@ -1047,6 +1141,12 @@ function route() {
   const { path, params } = parseHash();
   if (path === lastRoute) { /* 相同路由不重渲染（列表筛选等走内部状态） */ }
   lastRoute = path;
+
+  // 切换视图前先解绑上一个视图登记的全局事件
+  if (typeof VIEW_CLEANUP === 'function') {
+    try { VIEW_CLEANUP(); } catch (e) { /* ignore */ }
+  }
+  VIEW_CLEANUP = null;
 
   $('#page-title').textContent = PAGE_TITLES[path] || '仪表盘';
   const activeRoute = path === 'editor' ? (params.get('scope') === 'drafts' ? 'drafts' : 'posts') : path;
@@ -2643,53 +2743,332 @@ async function renderEssay(container) {
   });
 }
 
-/* ------------------------------ 媒体库 ------------------------------ */
+/* ------------------------------ 媒体库 · 云图床（PicGo 风格） ------------------------------ */
+
+/** 支持的图床类型 */
+const BACKENDS = {
+  github: { name: 'GitHub 仓库', tip: '图片提交进博客仓库 source/img/upload/，随站点一起发布' },
+  oss: { name: '阿里云 OSS', tip: '上传到自己的 OSS Bucket，可绑定自定义域名 / CDN' },
+  custom: { name: '自定义接口', tip: '任意 multipart 上传接口（Chevereto、EasyImages、自建服务）' },
+};
+
+const MEDIA_ACCEPT = /\.(jpe?g|png|gif|webp|svg|avif|ico)$/i;
+const TEST_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==';
+
+/** 上传成功后自动复制 Markdown */
+let AUTO_COPY = localStorage.getItem('ftm_autocopy') !== '0';
+
+function currentBackend() {
+  return STORAGE.backend || 'github';
+}
+
+function backendInfo() {
+  return BACKENDS[currentBackend()] || BACKENDS.github;
+}
+
+/** 条目的最终访问地址（用于「复制链接」） */
+function galleryUrl(f) {
+  if (f.url) return f.url;
+  if (currentBackend() === 'github') {
+    return MODE === 'github' ? location.origin + '/img/upload/' + f.rel : '/img/upload/' + f.rel;
+  }
+  return '';
+}
+
+/** 条目在文章中的 Markdown 引用 */
+function galleryMarkdown(f) {
+  const name = String(f.name || f.rel || 'image').replace(/\.[^.]+$/, '');
+  if (currentBackend() === 'github') return `![${name}](/img/upload/${f.rel})`;
+  return `![${name}](${f.url || ''})`;
+}
+
+/** 缩略图地址（仓库模式走本地代理接口，云端直连） */
+function galleryThumb(f) {
+  if (f.url) return f.url;
+  return mediaSrc(f.rel);
+}
+
+/** 统一各图床返回的字段 */
+function normalizeGalleryFile(f) {
+  const rel = f.rel || f.key || '';
+  return {
+    key: f.key || f.rel || '',
+    rel,
+    name: f.name || String(rel).split('/').pop(),
+    url: f.url || '',
+    size: Number(f.size || 0),
+    mtime: Number(f.mtime || 0),
+  };
+}
+
+/** 图床设置面板 */
+function mediaSettingsHTML() {
+  const backend = currentBackend();
+  const oss = STORAGE.oss || {};
+  const cu = STORAGE.custom || {};
+  const headerLines = (cu.headers || []).map((h) => `${h.name}: ${h.value}`).join('\n');
+  const corsTip = MODE === 'github'
+    ? `<p class="hint">浏览器直传 OSS 需先给 Bucket 配置跨域规则（CORS）：来源 <code>${esc(location.origin)}</code>、允许方法 <code>PUT, POST, GET, HEAD</code>、允许 Headers <code>*</code>。未配置会提示跨域失败。Bucket 设为公共读后图片可直接外链。</p>`
+    : '<p class="hint">本机模式由后台服务代签名直传 OSS，无需配置 CORS。</p>';
+  const tabs = Object.keys(BACKENDS)
+    .map((k) => `<button class="picgo-tab ${backend === k ? 'active' : ''}" data-backend="${k}">${esc(BACKENDS[k].name)}</button>`)
+    .join('');
+  return `
+    <div class="picgo-tabs" id="st-tabs">${tabs}</div>
+
+    <div class="picgo-panel ${backend === 'github' ? '' : 'hidden'}" data-panel="github">
+      <p class="hint">GitHub 图床无需配置：图片按 <code>source/img/upload/年月/</code> 结构提交到博客仓库，随 Actions 自动部署；文章内用 <code>/img/upload/xxx.png</code> 引用。适合图片不多、希望和文章一起做版本管理的场景。</p>
+    </div>
+
+    <div class="picgo-panel ${backend === 'oss' ? '' : 'hidden'}" data-panel="oss">
+      <div class="picgo-grid2">
+        <label class="field"><span>AccessKey ID</span><input id="st-oss-key" value="${esc(oss.accessKeyId || '')}" placeholder="LTAI..." autocomplete="off" /></label>
+        <label class="field"><span>AccessKey Secret</span><input id="st-oss-secret" type="password" value="${esc(oss.accessKeySecret || '')}" placeholder="******" autocomplete="off" /></label>
+        <label class="field"><span>Bucket</span><input id="st-oss-bucket" value="${esc(oss.bucket || '')}" placeholder="xsxtk" /></label>
+        <label class="field"><span>Endpoint</span><input id="st-oss-endpoint" value="${esc(oss.endpoint || '')}" placeholder="oss-cn-beijing.aliyuncs.com" /></label>
+        <label class="field"><span>存储目录前缀</span><input id="st-oss-prefix" value="${esc(oss.dirPrefix || '')}" placeholder="img/upload" /></label>
+        <label class="field"><span>自定义域名 / CDN（可选）</span><input id="st-oss-domain" value="${esc(oss.customDomain || '')}" placeholder="https://img.example.com" /></label>
+      </div>
+      ${corsTip}
+      <p class="hint">填成与博客现有图片相同的 Bucket 就能统一管理，例如 Bucket <code>xsxtk</code> + Endpoint <code>oss-cn-beijing.aliyuncs.com</code>。密钥只保存在本机 / 本浏览器，不会写进仓库。</p>
+    </div>
+
+    <div class="picgo-panel ${backend === 'custom' ? '' : 'hidden'}" data-panel="custom">
+      <label class="field"><span>上传接口地址</span><input id="st-cu-url" value="${esc(cu.uploadUrl || '')}" placeholder="https://example.com/api/upload" /></label>
+      <div class="picgo-grid2">
+        <label class="field"><span>文件字段名</span><input id="st-cu-field" value="${esc(cu.fieldName || 'file')}" placeholder="file" /></label>
+        <label class="field"><span>URL 提取正则（可选）</span><input id="st-cu-regex" value="${esc(cu.urlRegex || '')}" placeholder="&quot;url&quot;\\s*:\\s*&quot;(.*?)&quot;" /></label>
+      </div>
+      <label class="field"><span>附加请求头（每行一个，Name: Value）</span><textarea id="st-cu-headers" rows="3" placeholder="Authorization: Bearer xxx">${esc(headerLines)}</textarea></label>
+      <p class="hint">接口返回里只要包含图片地址即可；留空正则时会自动抓取响应中第一个 <code>http(s)</code> 链接。该图床无法远程列举图片，下方「最近上传」会帮你留着记录。</p>
+    </div>
+
+    <div class="picgo-settings-foot">
+      <button class="btn btn-primary" id="media-settings-save">保存图床配置</button>
+      ${backend === 'github' ? '' : '<button class="btn btn-ghost" id="media-settings-test">测试上传</button>'}
+      <span class="hint" style="margin:0">${MODE === 'github' ? '配置仅保存在本浏览器，不会提交到服务器。' : '配置保存在后台服务的 admin/config.json 中。'}</span>
+    </div>`;
+}
 
 async function renderMedia(container) {
+  // 读取图床配置（本机模式配置在服务端，云端模式在浏览器本地）
+  try {
+    const s = await api('/api/storage');
+    if (s && s.storage) {
+      STORAGE = Object.assign(STORAGE, s.storage, {
+        oss: Object.assign({}, STORAGE.oss, s.storage.oss || {}),
+        custom: Object.assign({}, STORAGE.custom, s.storage.custom || {}),
+      });
+    }
+  } catch (e) { /* 读取失败则沿用本地缓存配置 */ }
+
+  const info = backendInfo();
   container.innerHTML = `
-    <div class="card">
-      <div class="card-head">
-        <h3>媒体库</h3>
-        <span class="hint" style="margin:0">点击图片复制 Markdown 引用；文件保存至 source/img/upload/</span>
-      </div>
-      <div class="card-body">
-        <div class="dropzone" id="media-dropzone">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
-          <div>点击或拖拽图片到这里上传（jpg / png / gif / webp / svg / avif，单张 ≤ 20MB）</div>
+    <div class="picgo">
+      <div class="card">
+        <div class="card-head">
+          <h3>云图库 <span class="picgo-chip">${esc(info.name)}</span></h3>
+          <div class="picgo-head-actions">
+            <button class="btn btn-ghost btn-sm" id="media-refresh">刷新相册</button>
+            <button class="btn btn-ghost btn-sm" id="media-settings-toggle">图床设置</button>
+          </div>
         </div>
-        <input type="file" id="media-file-input" accept="image/*" multiple style="display:none" />
-        <div class="media-grid" id="media-grid"></div>
+        <div class="card-body">
+          <div class="picgo-drop" id="media-dropzone">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="34" height="34"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+            <div class="picgo-drop-title">拖拽图片到这里，或点击选择文件</div>
+            <div class="picgo-drop-sub">也可以直接按 <kbd>Ctrl</kbd> + <kbd>V</kbd> 粘贴剪贴板中的截图</div>
+            <div class="picgo-drop-tags"><span>JPG</span><span>PNG</span><span>GIF</span><span>WEBP</span><span>SVG</span><span>AVIF</span><span class="picgo-drop-limit">单张 ≤ 20MB</span></div>
+            <div class="picgo-drop-tip">当前图床：${esc(info.name)} · ${esc(info.tip)}</div>
+          </div>
+          <input type="file" id="media-file-input" accept="image/*" multiple hidden />
+          <div class="picgo-progress hidden" id="media-progress">
+            <div class="picgo-progress-track"><i id="media-progress-inner"></i></div>
+            <div class="picgo-progress-text" id="media-progress-text"></div>
+          </div>
+          <div class="picgo-toolbar">
+            <label class="picgo-switch">
+              <input type="checkbox" id="media-autocopy" ${AUTO_COPY ? 'checked' : ''} />
+              <span>上传后自动复制 Markdown</span>
+            </label>
+            <span class="hint" style="margin:0">图片存入「${esc(info.name)}」，上传成功即可直接粘贴到文章里</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="media-settings-card">
+        <div class="card-head">
+          <h3>图床设置</h3>
+          <button class="btn btn-ghost btn-sm" id="media-settings-close">收起</button>
+        </div>
+        <div class="card-body">${mediaSettingsHTML()}</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>云相册 <span class="hint" id="media-count" style="margin:0"></span></h3>
+          <input class="picgo-search" id="media-search" placeholder="搜索文件名…" />
+        </div>
+        <div class="card-body">
+          <div id="media-recent"></div>
+          <div class="picgo-grid" id="media-grid"></div>
+        </div>
       </div>
     </div>`;
 
-  const dz = $('#media-dropzone');
+  const dropzone = $('#media-dropzone');
   const fileInput = $('#media-file-input');
+  let items = [];
+  let keyword = '';
+
+  /* ---------- 相册列表 ---------- */
+
+  const renderGrid = () => {
+    const grid = $('#media-grid');
+    const list = keyword
+      ? items.filter((f) => f.name.toLowerCase().includes(keyword))
+      : items;
+    $('#media-count').textContent = items.length ? `共 ${items.length} 张` : '';
+    if (!list.length) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">${
+        items.length ? '没有匹配的图片' : (currentBackend() === 'custom'
+          ? '该图床无法远程列举图片，可参考上方「最近上传」记录'
+          : '相册还是空的，上传第一张图片试试')
+      }</div>`;
+      return;
+    }
+    grid.innerHTML = list.map((f, i) => `
+      <div class="picgo-item" data-idx="${i}">
+        <div class="picgo-thumb">
+          <img src="${esc(galleryThumb(f))}" alt="${esc(f.name)}" loading="lazy" />
+          <div class="picgo-hover">
+            <button class="picgo-act" data-act="md" title="复制 Markdown 引用">MD</button>
+            <button class="picgo-act" data-act="url" title="复制图片链接">URL</button>
+            <button class="picgo-act" data-act="open" title="新窗口预览">预览</button>
+            <button class="picgo-act picgo-act-del" data-act="del" title="删除这张图片">删除</button>
+          </div>
+        </div>
+        <div class="picgo-meta">
+          <div class="picgo-name" title="${esc(f.name)}">${esc(f.name)}</div>
+          <div class="picgo-sub"><span>${fmtBytes(f.size)}</span>${f.mtime ? `<span>${fmtDate(f.mtime).slice(0, 10)}</span>` : ''}</div>
+        </div>
+      </div>`).join('');
+
+    $$('img', grid).forEach((img) => img.addEventListener('error', () => img.classList.add('broken')));
+    $$('.picgo-act', grid).forEach((btn) => btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const item = btn.closest('.picgo-item');
+      const f = list[Number(item.dataset.idx)];
+      const act = btn.dataset.act;
+      if (act === 'md') { copyText(galleryMarkdown(f)); return; }
+      if (act === 'url') { copyText(galleryUrl(f)); return; }
+      if (act === 'open') { window.open(galleryThumb(f), '_blank'); return; }
+      if (act === 'del') {
+        const ok = await confirmModal('删除图片', `确定要删除「${f.name}」吗？此操作不可恢复。`, true);
+        if (!ok) return;
+        btn.disabled = true;
+        try {
+          await api('/api/gallery?key=' + encodeURIComponent(f.key), { method: 'DELETE' });
+          item.remove();
+          items = items.filter((x) => x.key !== f.key);
+          renderGrid();
+          toast(currentBackend() === 'github' && MODE === 'github'
+            ? '已从仓库删除（1~2 分钟后自动部署生效）' : '已删除', 'ok', 3200);
+        } catch (err) {
+          btn.disabled = false;
+          toast(err.message, 'error', 4200);
+        }
+      }
+    }));
+  };
+
+  const load = async () => {
+    const grid = $('#media-grid');
+    grid.innerHTML = '<div class="picgo-loading">正在读取云相册…</div>';
+    try {
+      const data = await api('/api/gallery');
+      items = (data.files || []).map(normalizeGalleryFile);
+      renderGrid();
+    } catch (e) {
+      items = [];
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">读取失败：${esc(e.message)}</div>`;
+    }
+  };
+
+  /* ---------- 最近上传记录 ---------- */
+
+  const renderRecent = () => {
+    const box = $('#media-recent');
+    const recs = getUploadRecords().slice(0, 12);
+    if (!recs.length) { box.innerHTML = ''; return; }
+    box.innerHTML = `
+      <div class="picgo-recent-head">最近上传<span class="hint" style="margin:0">（记录保存在本浏览器）</span></div>
+      <div class="picgo-recent-list">
+        ${recs.map((r) => `
+          <div class="picgo-recent-item" data-md="${esc(r.markdown || `![](${r.url})`)}" title="${esc(r.name || r.url)} · 点击复制 Markdown">
+            <img src="${esc(r.url)}" alt="" loading="lazy" />
+            <span>复制</span>
+          </div>`).join('')}
+      </div>`;
+    $$('.picgo-recent-item', box).forEach((el) => {
+      el.addEventListener('click', () => copyText(el.dataset.md));
+    });
+  };
+
+  /* ---------- 上传 ---------- */
 
   const uploadFiles = async (files) => {
-    for (const file of files) {
-      if (!/\.(jpe?g|png|gif|webp|svg|avif|ico)$/i.test(file.name)) {
-        toast(`跳过不支持的文件：${file.name}`, 'warn');
-        continue;
+    const list = Array.from(files || []).filter((f) => {
+      if (!MEDIA_ACCEPT.test(f.name || '')) {
+        toast(`跳过不支持的文件：${f.name || '未命名'}`, 'warn');
+        return false;
       }
+      return true;
+    });
+    if (!list.length) return;
+    const prog = $('#media-progress');
+    prog.classList.remove('hidden');
+    let done = 0;
+    const okItems = [];
+    for (const file of list) {
+      const label = file.name || `剪贴板图片-${Date.now()}.png`;
+      $('#media-progress-inner').style.width = `${Math.round((done / list.length) * 100)}%`;
+      $('#media-progress-text').textContent = `正在上传 ${done + 1}/${list.length} · ${label}（${fmtBytes(file.size)}）`;
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', file, label);
       try {
-        toast(`正在上传 ${file.name}…`);
-        await apiUpload(fd);
-        toast(`${file.name} 上传成功`, 'ok');
+        const out = await apiUpload(fd);
+        okItems.push(out);
+        const rec = { name: out.name || label, rel: out.rel, url: out.url };
+        pushUploadRecord({
+          name: rec.name,
+          url: out.url,
+          rel: out.rel || '',
+          backend: out.backend || currentBackend(),
+          markdown: galleryMarkdown(rec),
+        });
+        toast(`${label} 上传成功`, 'ok');
       } catch (e) {
-        toast(e.message, 'error');
+        toast(`${label} 上传失败：${e.message}`, 'error', 6000);
       }
+      done += 1;
+      $('#media-progress-inner').style.width = `${Math.round((done / list.length) * 100)}%`;
+      $('#media-progress-text').textContent = `已完成 ${done}/${list.length}`;
     }
+    if (AUTO_COPY && okItems.length) {
+      copyText(okItems.map((r) => galleryMarkdown({ name: r.name, rel: r.rel, url: r.url })).join('\n'));
+    }
+    setTimeout(() => prog.classList.add('hidden'), 900);
+    renderRecent();
     load();
   };
 
-  dz.addEventListener('click', () => fileInput.click());
-  dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('dragover'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
-  dz.addEventListener('drop', (e) => {
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', (e) => {
     e.preventDefault();
-    dz.classList.remove('dragover');
+    dropzone.classList.remove('dragover');
     uploadFiles(Array.from(e.dataTransfer.files || []));
   });
   fileInput.addEventListener('change', (e) => {
@@ -2697,50 +3076,126 @@ async function renderMedia(container) {
     e.target.value = '';
   });
 
-  const load = async () => {
-    try {
-      const data = await api('/api/media');
-      const grid = $('#media-grid');
-      if (!data.files.length) {
-        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">暂无图片，快上传第一张吧</div>';
-        return;
-      }
-      grid.innerHTML = data.files.map((f) => `
-        <div class="media-item" data-rel="${esc(f.rel)}">
-          <div class="media-thumb" style="background-image:url('${mediaSrc(f.rel)}')" title="点击复制 Markdown">
-            <button class="media-del" title="删除">×</button>
-          </div>
-          <div class="media-info">
-            <div class="media-name" title="${esc(f.name)}">${esc(f.name)}</div>
-            <div class="media-meta"><span>${fmtBytes(f.size)}</span><span>${fmtDate(f.mtime).slice(0, 10)}</span></div>
-          </div>
-        </div>`).join('');
-      $$('.media-item', grid).forEach((item) => {
-        const rel = item.dataset.rel;
-        const name = rel.split('/').pop();
-        $('.media-thumb', item).addEventListener('click', () => copyText(`![${name}](/img/upload/${rel})`));
-        $('.media-del', item).addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const ok = await confirmModal('删除确认', '确定删除这张图片吗？此操作不可恢复。', true);
-          if (!ok) return;
-          const btn = e.currentTarget;
-          btn.disabled = true;
-          try {
-            await api(`/api/media/${encodeURIComponent(rel)}`, { method: 'DELETE' });
-            // 先从界面移除，避免列表刷新延迟造成"删不掉"的错觉
-            item.remove();
-            toast(MODE === 'github' ? '已从仓库删除（1~2 分钟后自动部署生效）' : '已删除', 'ok', 3200);
-            load();
-          } catch (err) {
-            btn.disabled = false;
-            toast(err.message, 'error', 4200);
-          }
-        });
+  $('#media-refresh').addEventListener('click', () => { toast('正在刷新…'); load(); });
+  $('#media-autocopy').addEventListener('change', (e) => {
+    AUTO_COPY = e.target.checked;
+    localStorage.setItem('ftm_autocopy', AUTO_COPY ? '1' : '0');
+    toast(AUTO_COPY ? '上传后将自动复制 Markdown' : '已关闭自动复制', 'ok');
+  });
+  $('#media-search').addEventListener('input', (e) => {
+    keyword = e.target.value.trim().toLowerCase();
+    renderGrid();
+  });
+
+  /* ---------- 图床设置 ---------- */
+
+  const settingsCard = $('#media-settings-card');
+  const toggleSettings = (show) => {
+    settingsCard.classList.toggle('hidden', !show);
+    if (show) settingsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+  $('#media-settings-toggle').addEventListener('click', () => toggleSettings(settingsCard.classList.contains('hidden')));
+  $('#media-settings-close').addEventListener('click', () => toggleSettings(false));
+
+  $$('#st-tabs .picgo-tab').forEach((tab) => tab.addEventListener('click', () => {
+    $$('#st-tabs .picgo-tab').forEach((t) => t.classList.toggle('active', t === tab));
+    $$('.picgo-panel', settingsCard).forEach((p) => p.classList.toggle('hidden', p.dataset.panel !== tab.dataset.backend));
+  }));
+
+  $('#media-settings-save').addEventListener('click', async () => {
+    const activeTab = $('#st-tabs .picgo-tab.active');
+    const headers = $('#st-cu-headers').value.split('\n')
+      .map((l) => l.trim()).filter(Boolean)
+      .map((l) => {
+        const i = l.indexOf(':');
+        return i === -1 ? { name: l, value: '' } : { name: l.slice(0, i).trim(), value: l.slice(i + 1).trim() };
       });
+    const next = {
+      backend: activeTab ? activeTab.dataset.backend : currentBackend(),
+      oss: {
+        accessKeyId: $('#st-oss-key').value.trim(),
+        accessKeySecret: $('#st-oss-secret').value.trim(),
+        bucket: $('#st-oss-bucket').value.trim(),
+        endpoint: $('#st-oss-endpoint').value.trim() || 'oss-cn-beijing.aliyuncs.com',
+        dirPrefix: $('#st-oss-prefix').value.trim(),
+        customDomain: $('#st-oss-domain').value.trim(),
+      },
+      custom: {
+        uploadUrl: $('#st-cu-url').value.trim(),
+        fieldName: $('#st-cu-field').value.trim() || 'file',
+        headers,
+        urlRegex: $('#st-cu-regex').value.trim(),
+      },
+    };
+    if (next.backend === 'oss' && (!next.oss.accessKeyId || !next.oss.accessKeySecret || !next.oss.bucket)) {
+      const go = await confirmModal('配置不完整', 'OSS 图床缺少 AccessKeyId / AccessKeySecret / Bucket，确定仍要保存吗？', true);
+      if (!go) return;
+    }
+    if (next.backend === 'custom' && !next.custom.uploadUrl) {
+      const go = await confirmModal('配置不完整', '自定义图床还没有填写上传接口地址，确定仍要保存吗？', true);
+      if (!go) return;
+    }
+    try {
+      const out = await api('/api/storage', { method: 'PUT', body: JSON.stringify(next) });
+      STORAGE = Object.assign(STORAGE, (out && out.storage) || next);
+      saveStorageCfg();
+      toast((out && out.message) || '图床配置已保存', 'ok');
+      route();
     } catch (e) {
       toast(e.message, 'error');
     }
+  });
+
+  const testBtn = $('#media-settings-test');
+  if (testBtn) {
+    testBtn.addEventListener('click', async () => {
+      const raw = testBtn.textContent;
+      testBtn.disabled = true;
+      testBtn.textContent = '测试中…';
+      try {
+        const bin = atob(TEST_PNG_B64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+        const fd = new FormData();
+        fd.append('file', new Blob([bytes], { type: 'image/png' }), `test-${Date.now()}.png`);
+        const out = await apiUpload(fd);
+        toast(`上传成功：${out.url}`, 'ok', 6000);
+      } catch (e) {
+        toast(`测试失败：${e.message}`, 'error', 6000);
+      }
+      testBtn.disabled = false;
+      testBtn.textContent = raw;
+    });
+  }
+
+  /* ---------- 粘贴上传 / 拖拽防护（离开视图时自动解绑） ---------- */
+
+  const onPaste = (e) => {
+    const clip = e.clipboardData;
+    if (!clip) return;
+    const files = [];
+    Array.from(clip.items || []).forEach((it) => {
+      if (it.kind === 'file' && /^image\//i.test(it.type)) {
+        const f = it.getAsFile();
+        if (f) files.push(f);
+      }
+    });
+    if (files.length) {
+      e.preventDefault();
+      uploadFiles(files);
+    }
   };
+  const preventDrop = (e) => e.preventDefault();
+  document.addEventListener('paste', onPaste);
+  window.addEventListener('dragover', preventDrop);
+  window.addEventListener('drop', preventDrop);
+  VIEW_CLEANUP = () => {
+    document.removeEventListener('paste', onPaste);
+    window.removeEventListener('dragover', preventDrop);
+    window.removeEventListener('drop', preventDrop);
+  };
+
+  renderRecent();
   load();
 }
 

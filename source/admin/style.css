@@ -1289,6 +1289,196 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
 .media-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .media-meta { color: var(--muted); font-size: 11px; display: flex; justify-content: space-between; margin-top: 3px; }
 
+/* ============ 云图床（PicGo 风格） ============ */
+
+.picgo { display: flex; flex-direction: column; gap: 18px; }
+.picgo-head-actions { display: flex; gap: 8px; align-items: center; }
+
+.picgo-chip {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid rgba(211, 18, 45, 0.18);
+}
+
+.picgo-drop {
+  border: 2px dashed #cdd1de;
+  border-radius: var(--radius);
+  padding: 30px 20px;
+  text-align: center;
+  color: var(--muted);
+  cursor: pointer;
+  background: linear-gradient(180deg, #fcfcfe, #f7f8fc);
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.picgo-drop:hover, .picgo-drop.dragover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  color: var(--brand);
+  transform: translateY(-1px);
+}
+
+.picgo-drop svg { opacity: 0.55; transition: transform 0.2s ease; }
+.picgo-drop.dragover svg { transform: scale(1.1); }
+.picgo-drop-title { font-size: 15px; font-weight: 600; color: var(--text); margin-top: 8px; }
+.picgo-drop.dragover .picgo-drop-title { color: var(--brand); }
+.picgo-drop-sub { font-size: 12.5px; margin-top: 5px; }
+
+.picgo-drop kbd {
+  padding: 1px 6px;
+  border: 1px solid #d8dbe6;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #fff;
+  font-size: 11.5px;
+  font-family: inherit;
+}
+
+.picgo-drop-tags { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 12px; font-size: 11px; }
+.picgo-drop-tags span { padding: 2px 8px; border-radius: 6px; background: #eef0f6; color: var(--muted); letter-spacing: 0.04em; }
+.picgo-drop-tags .picgo-drop-limit { background: var(--gold-soft); color: #9a6b0c; }
+.picgo-drop-tip { margin-top: 12px; font-size: 12px; opacity: 0.9; }
+
+.picgo-progress { margin-top: 14px; }
+.picgo-progress-track { height: 8px; border-radius: 99px; background: #eceef5; overflow: hidden; }
+.picgo-progress-track i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--brand), var(--gold));
+  transition: width 0.25s ease;
+}
+.picgo-progress-text { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+.picgo-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.picgo-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; user-select: none; }
+.picgo-switch input { width: 16px; height: 16px; accent-color: var(--brand); }
+
+.picgo-search {
+  width: 180px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  outline: none;
+  background: #fafbfd;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.picgo-search:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); background: #fff; }
+
+.picgo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+
+.picgo-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.picgo-item:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+
+.picgo-thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: repeating-conic-gradient(#f2f3f8 0% 25%, #ffffff 0% 50%) 50% / 16px 16px;
+}
+.picgo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.picgo-thumb img.broken { opacity: 0.22; }
+
+.picgo-hover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  background: linear-gradient(180deg, rgba(10, 12, 20, 0) 35%, rgba(10, 12, 20, 0.72));
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.picgo-item:hover .picgo-hover { opacity: 1; }
+.picgo-act {
+  border: none;
+  border-radius: 7px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  transition: background 0.15s ease;
+}
+.picgo-act:hover { background: rgba(255, 255, 255, 0.34); }
+.picgo-act-del:hover { background: var(--danger); }
+
+.picgo-meta { padding: 8px 10px; }
+.picgo-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picgo-sub { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; }
+.picgo-loading { grid-column: 1 / -1; padding: 36px; text-align: center; color: var(--muted); font-size: 13px; }
+
+.picgo-recent-head { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; display: flex; gap: 6px; align-items: center; }
+.picgo-recent-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; }
+.picgo-recent-item {
+  position: relative;
+  flex: 0 0 auto;
+  width: 92px;
+  height: 68px;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: #f1f2f6;
+}
+.picgo-recent-item img { width: 100%; height: 100%; object-fit: cover; }
+.picgo-recent-item span {
+  position: absolute;
+  inset: auto 0 0 0;
+  font-size: 11px;
+  color: #fff;
+  text-align: center;
+  background: rgba(10, 12, 20, 0.62);
+  padding: 2px 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.picgo-recent-item:hover span { opacity: 1; }
+
+.picgo-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; padding: 4px; background: #f4f5fa; border-radius: 12px; }
+.picgo-tab {
+  flex: 1 1 auto;
+  border: none;
+  background: transparent;
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.picgo-tab.active { background: #fff; color: var(--brand); box-shadow: var(--shadow-sm); }
+
+.picgo-panel { border-top: 1px dashed var(--border); padding-top: 16px; }
+.picgo-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.picgo-settings-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.picgo code { background: #f1f2f6; padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+
+.btn-ghost { background: #f6f7fb; }
+
+@media (max-width: 760px) {
+  .picgo-grid2 { grid-template-columns: 1fr; }
+  .picgo-search { width: 120px; }
+  .picgo-toolbar { flex-direction: column; align-items: flex-start; }
+}
+
 /* ============ 设置页 ============ */
 
 .settings-grid { grid-template-columns: 1fr 1fr; }

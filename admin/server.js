@@ -28,6 +28,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { URL } = require('url');
 const FM = require('../source/admin/fm.js');
+const Storage = require('../source/admin/storage.js');
 
 /* ------------------------------ 基础路径 ------------------------------ */
 
@@ -112,6 +113,24 @@ function keyDecode(key) {
 
 /* ------------------------------ 配置管理 ------------------------------ */
 
+const DEFAULT_STORAGE = () => ({
+  backend: 'github', // github | oss | custom
+  oss: {
+    accessKeyId: '',
+    accessKeySecret: '',
+    bucket: '',
+    endpoint: 'oss-cn-beijing.aliyuncs.com',
+    dirPrefix: 'img/upload',
+    customDomain: '',
+  },
+  custom: {
+    uploadUrl: '',
+    fieldName: 'file',
+    headers: [],
+    urlRegex: '',
+  },
+});
+
 const DEFAULT_CONFIG = () => ({
   host: '127.0.0.1',
   port: 4321,
@@ -121,6 +140,7 @@ const DEFAULT_CONFIG = () => ({
   tokenSecret: randomHex(32),
   sessionTtlDays: 7,
   created: nowLocal(),
+  storage: DEFAULT_STORAGE(),
 });
 
 let cfg;
@@ -923,6 +943,94 @@ async function handleApi(req, res, urlObj, user) {
     await fsp.rename(absPath, dest);
     log(`草稿已发布：${filename}`);
     return sendJSON(res, 200, { ok: true, key: keyEncode(path.relative(POSTS_DIR, dest)) });
+  }
+
+  /* ---- 图床配置（云相册） ---- */
+  if (pathname === '/api/storage' && method === 'GET') {
+    if (!cfg.storage) cfg.storage = DEFAULT_STORAGE();
+    return sendJSON(res, 200, { ok: true, storage: cfg.storage });
+  }
+  if (pathname === '/api/storage' && method === 'PUT') {
+    const body = await readJSON(req);
+    const def = DEFAULT_STORAGE();
+    const next = {
+      backend: ['github', 'oss', 'custom'].includes(body.backend) ? body.backend : def.backend,
+      oss: Object.assign({}, def.oss, body.oss || {}),
+      custom: Object.assign({}, def.custom, body.custom || {}),
+    };
+    if (!Array.isArray(next.custom.headers)) next.custom.headers = [];
+    cfg.storage = next;
+    saveConfig();
+    log(`已更新图床配置：${next.backend}`);
+    return sendJSON(res, 200, { ok: true, storage: next, message: '图床配置已保存' });
+  }
+
+  /* ---- 统一上传（按当前图床） ---- */
+  if (pathname === '/api/upload' && method === 'POST') {
+    const ctype = req.headers['content-type'] || '';
+    const bm = /boundary=(?:"([^"]+)"|([^;]+))/.exec(ctype);
+    if (!bm) return sendJSON(res, 400, { ok: false, message: '请使用 multipart/form-data 上传' });
+    const buffer = await readBody(req);
+    const parts = parseMultipart(buffer, bm[1] || bm[2]);
+    const filePart = parts.find((p) => p.filename);
+    if (!filePart || !filePart.data.length) return sendJSON(res, 400, { ok: false, message: '未找到上传文件' });
+    if (filePart.data.length > 20 * 1024 * 1024) return sendJSON(res, 413, { ok: false, message: '文件超过 20MB 限制' });
+    const rawName = path.basename(filePart.filename);
+    if (!MEDIA_EXT.test(path.extname(rawName).toLowerCase())) {
+      return sendJSON(res, 400, { ok: false, message: '仅支持 jpg/png/gif/webp/svg/avif/ico 格式' });
+    }
+    const backend = (cfg.storage && cfg.storage.backend) || 'github';
+
+    if (backend === 'github') {
+      const d = new Date();
+      const monthDir = path.join(IMG_DIR, `${d.getFullYear()}${pad(d.getMonth() + 1)}`);
+      await fsp.mkdir(monthDir, { recursive: true });
+      const name = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${randomHex(4)}-${FM.sanitizeName(rawName.slice(0, 40))}`;
+      const dest = path.join(monthDir, name);
+      await fsp.writeFile(dest, filePart.data);
+      const rel = path.relative(IMG_DIR, dest).split(path.sep).join('/');
+      log(`已上传图片（GitHub 仓库）：${rel}`);
+      return sendJSON(res, 200, { ok: true, backend, name, rel, url: `/img/upload/${rel}` });
+    }
+
+    const out = await Storage.upload(cfg.storage, {
+      filename: rawName,
+      contentType: filePart.contentType,
+      bytes: filePart.data,
+    });
+    log(`已上传图片（${backend}）：${out.key}`);
+    return sendJSON(res, 200, { ok: true, backend, name: out.key.split('/').pop(), key: out.key, url: out.url });
+  }
+
+  /* ---- 云相册列表 ---- */
+  if (pathname === '/api/gallery' && method === 'GET') {
+    const backend = (cfg.storage && cfg.storage.backend) || 'github';
+    if (backend === 'github') {
+      const files = await listMediaFiles();
+      return sendJSON(res, 200, { ok: true, backend, files });
+    }
+    const files = await Storage.list(cfg.storage, 200);
+    return sendJSON(res, 200, { ok: true, backend, files });
+  }
+
+  /* ---- 云相册删除 ---- */
+  if (pathname === '/api/gallery' && method === 'DELETE') {
+    const backend = (cfg.storage && cfg.storage.backend) || 'github';
+    const key = urlObj.searchParams.get('key') || '';
+    if (!key) return sendJSON(res, 400, { ok: false, message: '缺少 key 参数' });
+    if (backend === 'github') {
+      const abs = safeResolve(IMG_DIR, key);
+      const stat = await fsp.stat(abs).catch(() => {
+        throw new HttpError(404, '文件不存在');
+      });
+      if (!stat.isFile()) throw new HttpError(404, '文件不存在');
+      await fsp.unlink(abs);
+      log(`已删除图片：${key}`);
+      return sendJSON(res, 200, { ok: true, message: '已删除' });
+    }
+    await Storage.remove(cfg.storage, key);
+    log(`已删除云端图片：${key}`);
+    return sendJSON(res, 200, { ok: true, message: '已删除' });
   }
 
   /* ---- 媒体上传 ---- */

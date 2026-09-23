@@ -16,8 +16,27 @@
 | 草稿箱 | ✓ 一键发布 | ✓ 一键发布 |
 | Markdown 编辑器 | 工具栏、实时预览、图片上传、Ctrl+S | 同左 |
 | 媒体库 | 上传到 `source/img/upload/` | 上传到 GitHub 仓库同路径 |
+| 云图库（PicGo 风格） | 拖拽 / 点击 / Ctrl+V 粘贴上传，可切换图床并浏览云端相册 | 同左（浏览器直传 OSS / 自定义接口） |
 | 站点设置 | 表单 + 原始配置编辑（自动备份） | 同左（Git 历史即备份） |
 | 构建发布 | hexo clean/generate/deploy + SSE 实时日志 | 触发 GitHub Actions + 状态轮询 |
+
+### 云图库（PicGo 风格的在线图床）
+
+「媒体库」页面已升级为 PicGo 风格的**云图库**：
+
+- **三种图床**随时切换：
+  - `GitHub 仓库` —— 图片提交到 `source/img/upload/`，随站点一起发布，无需任何配置；
+  - `阿里云 OSS` —— 填 AccessKey ID / Secret / Bucket / Endpoint（如 `xsxtk` + `oss-cn-beijing.aliyuncs.com`），支持自定义域名 / CDN；
+  - `自定义接口` —— 任意 multipart 上传接口（Chevereto、EasyImages、自建服务），用正则从响应里提取图片地址。
+- **多种上传方式**：拖拽到上传区、点击选择文件、直接 `Ctrl+V` 粘贴剪贴板截图，支持多选与进度条。
+- **上传后自动复制 Markdown**（可关闭），复制内容形如 `![名字](地址)`，粘贴到文章即可。
+- **云相册**：列出当前图床的图片（OSS 走 ListObjects），支持搜索、悬停复制 Markdown / 复制链接 / 预览 / 删除。
+- **最近上传记录**：保存在本浏览器，自定义图床无法远程列举时也能找回地址。
+- **一键测试上传**：图床设置面板中点击「测试上传」，会用一张 1×1 测试图验证配置是否可用。
+
+> ⚠️ 云端模式下浏览器直传 OSS 需要先给 Bucket 配置跨域规则（CORS）：来源填站点域名、
+> 允许方法 `PUT, POST, GET, HEAD`、允许 Headers `*`。本机模式由后台服务代签名上传，无需 CORS。
+> AccessKey 只保存在本机 `admin/config.json`（本机模式）或浏览器 localStorage（云端模式），不会写进仓库。
 
 ---
 
@@ -145,6 +164,7 @@ source/admin/          # 后台前端（本机与 GitHub 云端共用，随博�
 ├── index.html
 ├── app.js
 ├── style.css
+├── storage.js         # 图床模块：OSS 直传签名 / 自定义接口 / 云相册列表（Node 与浏览器共用）
 └── fm.js              # Front-matter 解析（Node 服务端与浏览器共用）
 
 .github/workflows/

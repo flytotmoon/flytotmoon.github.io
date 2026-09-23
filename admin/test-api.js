@@ -181,6 +181,88 @@ async function main() {
     assert('删除图片成功', delMedia.status === 200);
   }
 
+  // ---- 图床（云相册）配置 ----
+  const stGet = await api('/api/storage');
+  assert('读取图床配置', stGet.status === 200 && stGet.data.storage && typeof stGet.data.storage.backend === 'string');
+
+  const stPut = await api('/api/storage', {
+    method: 'PUT',
+    body: JSON.stringify({
+      backend: 'oss',
+      oss: { accessKeyId: 'test-ak', accessKeySecret: 'test-sk', bucket: 'xsxtk-test', endpoint: 'oss-cn-beijing.aliyuncs.com', dirPrefix: 'img/upload' },
+    }),
+  });
+  assert('保存图床配置（切到 OSS）', stPut.status === 200 && stPut.data.storage.backend === 'oss' && stPut.data.storage.oss.bucket === 'xsxtk-test');
+
+  const stBack = await api('/api/storage', { method: 'PUT', body: JSON.stringify({ backend: 'github', oss: stGet.data.storage.oss }) });
+  assert('图床切回 GitHub 仓库', stBack.status === 200 && stBack.data.storage.backend === 'github');
+
+  // ---- 统一上传入口 + 云相册 ----
+  const fd2 = new FormData();
+  fd2.append('file', new Blob([png], { type: 'image/png' }), 'gallery-test.png');
+  const upRes2 = await fetch(BASE + '/api/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: fd2 });
+  const up2 = await upRes2.json();
+  assert('统一上传接口写入仓库', upRes2.status === 200 && up2.backend === 'github' && Boolean(up2.rel));
+
+  const gal = await api('/api/gallery');
+  assert('云相册列出新图', gal.status === 200 && gal.data.backend === 'github' && gal.data.files.some((f) => f.rel === up2.rel));
+  const galDel = await api('/api/gallery?key=' + encodeURIComponent(up2.rel), { method: 'DELETE' });
+  assert('云相册删除图片', galDel.status === 200);
+  const galAfter = await api('/api/gallery');
+  assert('删除后不再出现在相册', galAfter.status === 200 && !galAfter.data.files.some((f) => f.rel === up2.rel));
+
+  // ---- 图床模块单元测试（source/admin/storage.js） ----
+  const StorageMod = require('../source/admin/storage.js');
+  const cryptoMod = require('crypto');
+  const httpMod = require('http');
+
+  const hmacVec = await StorageMod.hmacSha1Base64('key', 'The quick brown fox jumps over the lazy dog');
+  assert('HMAC-SHA1 签名向量（RFC 2202）', hmacVec === '3nybhbi3iqa8ino29wqQcBydtNk=', hmacVec);
+
+  const fnInfo = StorageMod.buildFileName('我的 照片.PNG');
+  assert('上传文件名规范化', /^\d{8}-[0-9a-f]{8}-.+\.png$/.test(fnInfo.name), fnInfo.name);
+  assert('目录拼接去掉多余斜杠', StorageMod.joinPrefix('/img/upload/', '/202601/x.png') === 'img/upload/202601/x.png', StorageMod.joinPrefix('/img/upload/', '/202601/x.png'));
+  assert('URL 提取（自定义正则）', StorageMod.extractUrl('{"data":{"url":"https://cdn.x.com/a.png"}}', '"url"\\s*:\\s*"(.*?)"') === 'https://cdn.x.com/a.png');
+  assert('URL 提取（默认第一个链接）', StorageMod.extractUrl('{"link":"https://cdn.x.com/b.jpg"}') === 'https://cdn.x.com/b.jpg');
+
+  // 自定义图床：上传到本地 mock 服务
+  const mock = httpMod.createServer((req, res) => {
+    let len = 0;
+    req.on('data', (c) => { len += c.length; });
+    req.on('end', () => {
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ code: 0, data: { url: `https://cdn.mock.local/${len}.png` } }));
+    });
+  });
+  await new Promise((r) => mock.listen(0, '127.0.0.1', r));
+  const mockPort = mock.address().port;
+  try {
+    const customOut = await StorageMod.upload(
+      { backend: 'custom', custom: { uploadUrl: `http://127.0.0.1:${mockPort}/upload`, fieldName: 'file', headers: [{ name: 'X-Test', value: '1' }], urlRegex: '' } },
+      { filename: 'mock.png', contentType: 'image/png', bytes: png }
+    );
+    assert('自定义图床上传并解析地址', /^https:\/\/cdn\.mock\.local\/\d+\.png$/.test(customOut.url), customOut.url);
+  } finally {
+    mock.close();
+  }
+
+  // OSS 直传：拦截 fetch 校验 V1 签名
+  const realFetch = global.fetch;
+  let captured = null;
+  global.fetch = async (url, opts) => { captured = { url, opts }; return { ok: true, status: 200, text: async () => '' }; };
+  try {
+    const ossCfg = { accessKeyId: 'ak', accessKeySecret: 'sk', bucket: 'bkt', endpoint: 'oss-cn-beijing.aliyuncs.com', dirPrefix: 'img/upload', customDomain: '' };
+    const ossOut = await StorageMod.upload({ backend: 'oss', oss: ossCfg }, { filename: 'a.png', contentType: 'image/png', bytes: png });
+    const date = captured.opts.headers.Date;
+    const expect = 'OSS ak:' + cryptoMod.createHmac('sha1', 'sk').update(`PUT\n\nimage/png\n${date}\n/bkt/${ossOut.key}`).digest('base64');
+    assert('OSS 直传签名（V1）正确', captured.opts.headers.Authorization === expect, captured.opts.headers.Authorization);
+    assert('OSS 直传地址正确', captured.url === `https://bkt.oss-cn-beijing.aliyuncs.com/${ossOut.key}`, captured.url);
+    assert('OSS 公共访问地址正确', ossOut.url === `https://bkt.oss-cn-beijing.aliyuncs.com/${ossOut.key}`, ossOut.url);
+    assert('OSS 自定义域名优先生效', StorageMod.ossPublicUrl({ bucket: 'bkt', endpoint: 'oss-cn-beijing.aliyuncs.com', customDomain: 'https://img.example.com/' }, 'a/b.png') === 'https://img.example.com/a/b.png');
+  } finally {
+    global.fetch = realFetch;
+  }
+
   // 修改密码（改回默认，避免影响后续）
   const pw = await api('/api/auth/password', { method: 'POST', body: JSON.stringify({ old: 'admin123', new: 'admin123' }) });
   assert('修改密码接口可用', pw.status === 200);

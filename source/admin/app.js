@@ -7,7 +7,7 @@
 /* ------------------------------ 基础工具 ------------------------------ */
 
 const $ = (sel, root = document) => root.querySelector(sel);
-const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+const $$ = (sel, root = document) => (root ? Array.from(root.querySelectorAll(sel)) : []);
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
@@ -1153,6 +1153,30 @@ function parseHash() {
   return { path, params };
 }
 
+/**
+ * 为当前视图准备一个全新的 #page-container。
+ *
+ * 各视图的 render 都是 async 的：如果在它的 await 还没返回时用户切换了视图，
+ * 它后续的 $('#xxx') 查询就会拿到 null（Cannot read properties of null）。
+ * 这里把上一个容器「隐藏但留在 DOM 里」，让那些迟到的写入落进旧容器，
+ * 既不会报错，也不会污染新视图；15 秒后自动移除。
+ */
+function freshPageContainer() {
+  const current = document.getElementById('page-container');
+  if (!current) return null;
+  document.querySelectorAll('#page-container-stale').forEach((el) => el.remove());
+  const fresh = current.cloneNode(false);
+  current.id = 'page-container-stale';
+  current.classList.add('view-stale');
+  current.setAttribute('aria-hidden', 'true');
+  fresh.id = 'page-container';
+  // 插在当前容器之前：文档顺序上「活动容器」优先，$('#id') 会命中活动视图
+  current.parentNode.insertBefore(fresh, current);
+  const stale = current;
+  setTimeout(() => { if (stale.parentNode) stale.remove(); }, 15000);
+  return fresh;
+}
+
 function route() {
   const { path, params } = parseHash();
   if (path === lastRoute) { /* 相同路由不重渲染（列表筛选等走内部状态） */ }
@@ -1171,7 +1195,8 @@ function route() {
 
   if (path !== 'build') closeBuildSSE();
 
-  const container = $('#page-container');
+  const container = freshPageContainer() || $('#page-container');
+  if (!container) return;
   switch (path) {
     case 'dashboard': renderDashboard(container); break;
     case 'posts': renderPosts(container, 'posts'); break;
@@ -1318,7 +1343,9 @@ async function renderDashboard(container) {
   try {
     const meta = window.__metaCache || await api('/api/meta');
     window.__metaCache = meta;
-    const values = $('#stat-grid').querySelectorAll('.stat-value');
+    const statGrid = $('#stat-grid');
+    if (!statGrid) return; // 视图已被切换（容器已隐藏/移除），放弃后续 DOM 操作
+    const values = statGrid.querySelectorAll('.stat-value');
     values[0].textContent = meta.posts;
     values[1].textContent = meta.drafts;
     values[2].textContent = meta.categories.length;

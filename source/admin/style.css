@@ -608,6 +608,8 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
 @keyframes pulse-soft { 50% { opacity: 0.65; } }
 
 .page-container { padding: 26px 28px 60px; }
+/* 视图切换后短暂保留的旧容器：隐藏但仍可被迟到的异步代码安全写入，避免 null 报错 */
+.view-stale { display: none !important; pointer-events: none; }
 
 /* ============ 通用组件 ============ */
 

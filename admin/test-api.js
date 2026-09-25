@@ -401,6 +401,7 @@ async function main() {
   const appSrc = fs.readFileSync(path.join(__dirname, '..', 'source', 'admin', 'app.js'), 'utf8');
   assert('云端媒体删除走 ghFileMeta（不解码二进制）', /const \{ sha \} = await ghFileMeta\(filePath\);/.test(appSrc));
   assert('b64decode 对二进制内容容错', /function b64decode[\s\S]{0,240}?return bin;/.test(appSrc));
+  assert('视图切换使用独立容器（避免迟到异步写入报错）', /function freshPageContainer\(\)/.test(appSrc) && /freshPageContainer\(\) \|\| \$\('#page-container'\)/.test(appSrc));
 
   const pw = await api('/api/auth/password', { method: 'POST', body: JSON.stringify({ old: 'admin123', new: 'admin123' }) });
   assert('修改密码接口可用', pw.status === 200);

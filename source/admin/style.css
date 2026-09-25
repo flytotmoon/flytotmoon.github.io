@@ -840,9 +840,18 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
 
 /* ============ 编辑器（Typora 风格） ============ */
 
-.editor-card { overflow: hidden; }
+.editor-card {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* 卡片高度不超过可视区：文章属性 / 大纲 / 写作区各自内部滚动，
+     滚轮不会再带动整个页面（原先侧栏会跟着页面一起滚走） */
+  max-height: calc(100vh - 160px);
+  min-height: 520px;
+}
 
 .editor-head {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -870,10 +879,11 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
 .ty-mode button.active { background: #fff; color: var(--brand); box-shadow: var(--shadow-sm); }
 
 .editor-body {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   align-items: stretch;
   gap: 0;
-  min-height: 620px;
 }
 
 /* 左侧：文章属性 */
@@ -884,7 +894,7 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
   border-right: 1px solid var(--border);
   background: #fcfcfe;
   overflow-y: auto;
-  max-height: 76vh;
+  overscroll-behavior: contain;
 }
 .editor-body.hide-side .editor-side { display: none; }
 .side-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px; }
@@ -897,7 +907,7 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
   background: #fcfcfe;
   padding: 16px 12px 40px;
   overflow-y: auto;
-  max-height: 76vh;
+  overscroll-behavior: contain;
 }
 .editor-body.hide-outline .editor-outline { display: none; }
 .outline-head { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--muted); margin: 0 6px 10px; }
@@ -923,9 +933,10 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
 .outline-empty span { font-size: 11.5px; opacity: 0.8; }
 
 /* 中间：工具栏 + 写作区 + 状态栏 */
-.editor-main { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+.editor-main { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
 .editor-toolbar {
+  flex: 0 0 auto;
   display: flex;
   gap: 2px;
   flex-wrap: wrap;
@@ -948,11 +959,11 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
 .toolbar-btn:hover { background: var(--brand-soft); color: var(--brand); }
 
 .editor-area {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 300px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: minmax(0, 1fr);
-  min-height: 520px;
   background: #fff;
 }
 
@@ -966,12 +977,14 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
   line-height: 1.9;
   background: #fcfcfe;
   overflow-y: auto;
+  overscroll-behavior: contain;
   tab-size: 4;
 }
 
 .editor-preview {
   padding: 28px 36px 60px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-left: 1px solid var(--border);
   background: #fff;
 }
@@ -987,6 +1000,7 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
 
 /* 状态栏 */
 .editor-status {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1116,8 +1130,10 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
   .editor-area[data-mode="split"] .editor-preview { border-left: none; border-top: 1px solid var(--border); }
 }
 @media (max-width: 900px) {
-  .editor-body { flex-direction: column; }
-  .editor-side { flex: none; width: auto; border-right: none; border-bottom: 1px solid var(--border); max-height: none; }
+  .editor-card { max-height: none; min-height: 0; }
+  .editor-body { flex-direction: column; min-height: 0; }
+  .editor-side { flex: none; width: auto; border-right: none; border-bottom: 1px solid var(--border); overflow: visible; }
+  .editor-area { min-height: 420px; }
   .editor-body.hide-side .editor-side { display: none; }
 }
 
@@ -1771,7 +1787,7 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
   .sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0, 0, 0, 0.4); }
   .main { margin-left: 0; }
   #sidebar-toggle { display: inline-flex; }
-  .editor-area { flex-direction: column; }
+  .editor-area[data-mode="split"] { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) minmax(240px, auto); }
   .editor-preview { border-left: none; border-top: 1px solid var(--border); min-height: 240px; }
 }
 

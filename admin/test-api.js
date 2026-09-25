@@ -403,6 +403,36 @@ async function main() {
   assert('b64decode 对二进制内容容错', /function b64decode[\s\S]{0,240}?return bin;/.test(appSrc));
   assert('视图切换使用独立容器（避免迟到异步写入报错）', /function freshPageContainer\(\)/.test(appSrc) && /freshPageContainer\(\) \|\| \$\('#page-container'\)/.test(appSrc));
 
+  // 前端 Markdown 渲染器（编辑器预览）真跑一遍：把相关代码片段放到沙箱里求值
+  try {
+    const from = appSrc.indexOf('function esc(');
+    const to = appSrc.indexOf('/* ------------------------------ 编辑器');
+    const snippet = `${appSrc.slice(from, to)}\n;module.exports = { mdRender, inlineMd };`;
+    const stubStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+    const noopEl = { style: {}, classList: { add() {}, remove() {}, toggle() {} }, addEventListener() {}, appendChild() {}, querySelector: () => null, querySelectorAll: () => [] };
+    const sandbox = { module: { exports: {} }, exports: {}, localStorage: stubStorage, window: {}, navigator: { clipboard: null }, location: { hash: '', hostname: 'localhost', origin: 'http://localhost' }, fetch: () => Promise.resolve({}), setTimeout, clearTimeout, console };
+    sandbox.document = { querySelector: () => noopEl, querySelectorAll: () => [], createElement: () => noopEl, body: noopEl, addEventListener() {} };
+    // eslint-disable-next-line no-new-func
+    new Function('module', 'exports', 'localStorage', 'window', 'navigator', 'location', 'document', 'fetch', 'setTimeout', 'clearTimeout', 'console', snippet)(
+      sandbox.module, sandbox.exports, sandbox.localStorage, sandbox.window, sandbox.navigator, sandbox.location, sandbox.document, sandbox.fetch, setTimeout, clearTimeout, console
+    );
+    const mdRender = sandbox.module.exports.mdRender;
+
+    const taskHtml = mdRender('- [ ] 待办事项\n- [x] 已完成');
+    assert('预览支持任务列表', /class="ty-task-list"/.test(taskHtml) && /checked/.test(taskHtml) && /ty-task done/.test(taskHtml), taskHtml.slice(0, 160));
+
+    const codeHtml = mdRender('```js\nconst a = 1;\n```');
+    assert('预览代码块带语言与复制按钮', /ty-code-bar/.test(codeHtml) && /ty-code-lang">js</.test(codeHtml) && /class="ty-copy"/.test(codeHtml), codeHtml.slice(0, 160));
+    assert('代码块内容正确转义', /const a = 1;/.test(codeHtml) && !/<script/.test(mdRender('```\n<script>x</script>\n```')), 'escape');
+
+    assert('预览标题', mdRender('## 小标题') === '<h2>小标题</h2>', mdRender('## 小标题'));
+    assert('预览行内代码/加粗/链接', /<code>a<\/code>/.test(mdRender('`a`')) && /<strong>b<\/strong>/.test(mdRender('**b**')) && /href="https:\/\/x.com"/.test(mdRender('[x](https://x.com)')));
+    assert('预览表格', /<table><thead>/.test(mdRender('| a | b |\n| --- | --- |\n| 1 | 2 |')));
+    assert('预览引用与分割线', /<blockquote>/.test(mdRender('> 引用')) && /<hr \/>/.test(mdRender('---')));
+  } catch (e) {
+    assert('前端 Markdown 渲染器沙箱求值', false, e.message);
+  }
+
   const pw = await api('/api/auth/password', { method: 'POST', body: JSON.stringify({ old: 'admin123', new: 'admin123' }) });
   assert('修改密码接口可用', pw.status === 200);
 

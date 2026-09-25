@@ -1657,7 +1657,11 @@ function mdRender(src) {
       i++;
       while (i < lines.length && !isFence(lines[i])) { buf.push(lines[i]); i++; }
       i++;
-      html.push(`<pre><code>${esc(buf.join('\n'))}</code></pre>`);
+      // Typora 风格代码块：语言标签 + 复制按钮
+      html.push('<div class="ty-code">'
+        + `<div class="ty-code-bar"><span class="ty-code-lang">${esc(lang || 'text')}</span>`
+        + '<button type="button" class="ty-copy">复制</button></div>'
+        + `<pre><code>${esc(buf.join('\n'))}</code></pre></div>`);
       continue;
     }
 
@@ -1706,7 +1710,15 @@ function mdRender(src) {
         }
       }
       const tag = ordered ? 'ol' : 'ul';
-      html.push(`<${tag}>` + items.map((it) => '<li>' + inlineMd(it) + '</li>').join('') + `</${tag}>`);
+      const isTask = !ordered && items.some((it) => /^\[[ xX]\]\s+/.test(it));
+      html.push(`<${tag}${isTask ? ' class="ty-task-list"' : ''}>` + items.map((it) => {
+        const tm = /^\[([ xX])\]\s+([\s\S]*)$/.exec(it);
+        if (tm) {
+          const done = tm[1].toLowerCase() === 'x';
+          return `<li class="ty-task${done ? ' done' : ''}"><input type="checkbox" disabled${done ? ' checked' : ''} /><span>${inlineMd(tm[2])}</span></li>`;
+        }
+        return '<li>' + inlineMd(it) + '</li>';
+      }).join('') + `</${tag}>`);
       continue;
     }
 
@@ -1745,18 +1757,24 @@ async function renderEditor(container, params) {
   EDITOR_STATE.loaded = null;
 
   container.innerHTML = `
-    <div class="card">
+    <div class="card editor-card">
       <div class="editor-head">
         <a class="btn btn-sm" href="#/${scope === 'drafts' ? 'drafts' : 'posts'}">← 返回</a>
         <h3 id="editor-title-text">${key ? '编辑文章' : '新建文章'}</h3>
-        <div style="display:flex;gap:8px">
+        <div class="ty-mode" id="ed-mode">
+          <button data-mode="source" title="源码模式：只显示 Markdown 源码">源码</button>
+          <button data-mode="split" title="双栏：源码 + 预览">双栏</button>
+          <button data-mode="preview" title="预览模式：整洁排版，适合检查与阅读">预览</button>
+        </div>
+        <div class="editor-actions">
           ${key && scope === 'drafts' ? '<button class="btn btn-primary" id="ed-publish">🚀 发布到博客</button>' : ''}
           ${!key ? '<button class="btn" id="ed-save-draft">存为草稿</button>' : ''}
           <button class="btn btn-primary" id="ed-save">保存</button>
         </div>
       </div>
-      <div class="editor-body">
-        <div class="editor-side">
+      <div class="editor-body" id="ed-body">
+        <aside class="editor-side">
+          <div class="side-title">文章属性</div>
           <label class="field"><span>标题 *</span><input id="ed-title" placeholder="文章标题" /></label>
           <label class="field"><span>发布日期</span><input id="ed-date" type="datetime-local" /></label>
           <label class="field"><span>更新日期（留空则无）</span><input id="ed-updated" type="datetime-local" /></label>
@@ -1777,32 +1795,52 @@ async function renderEditor(container, params) {
             <label class="check-row"><input type="checkbox" id="ed-comments" checked /> 允许评论</label>
             <label class="check-row"><input type="checkbox" id="ed-mathjax" /> 数学公式</label>
           </div>
-        </div>
+        </aside>
         <div class="editor-main">
           <div class="editor-toolbar">
+            <button class="toolbar-btn" data-t="h1" title="一级标题">H1</button>
             <button class="toolbar-btn" data-t="h2" title="二级标题">H2</button>
             <button class="toolbar-btn" data-t="h3" title="三级标题">H3</button>
-            <button class="toolbar-btn" data-t="bold" title="加粗"><b>B</b></button>
-            <button class="toolbar-btn" data-t="italic" title="斜体"><i>I</i></button>
+            <span class="toolbar-sep"></span>
+            <button class="toolbar-btn" data-t="bold" title="加粗（Ctrl+B）"><b>B</b></button>
+            <button class="toolbar-btn" data-t="italic" title="斜体（Ctrl+I）"><i>I</i></button>
             <button class="toolbar-btn" data-t="strike" title="删除线"><s>S</s></button>
-            <button class="toolbar-btn" data-t="quote" title="引用">❝</button>
-            <button class="toolbar-btn" data-t="code" title="行内代码">&lt;/&gt;</button>
-            <button class="toolbar-btn" data-t="fence" title="代码块">🧱</button>
-            <button class="toolbar-btn" data-t="link" title="链接">🔗</button>
-            <button class="toolbar-btn" data-t="image" title="图片">🖼️</button>
+            <button class="toolbar-btn" data-t="code" title="行内代码（Ctrl+E）">&lt;/&gt;</button>
+            <span class="toolbar-sep"></span>
+            <button class="toolbar-btn" data-t="quote" title="引用">❝ 引用</button>
             <button class="toolbar-btn" data-t="ul" title="无序列表">• 列表</button>
             <button class="toolbar-btn" data-t="ol" title="有序列表">1. 列表</button>
+            <button class="toolbar-btn" data-t="task" title="任务列表">☑ 任务</button>
+            <button class="toolbar-btn" data-t="fence" title="代码块">🧱 代码块</button>
             <button class="toolbar-btn" data-t="table" title="表格">▦ 表格</button>
             <button class="toolbar-btn" data-t="hr" title="分割线">─</button>
-            <button class="toolbar-btn" data-t="upload" title="上传图片">📤 上传图片</button>
-            <label class="check-row" style="margin-left:auto"><input type="checkbox" id="ed-preview-toggle" checked /> 实时预览</label>
+            <span class="toolbar-sep"></span>
+            <button class="toolbar-btn" data-t="link" title="链接（Ctrl+K）">🔗 链接</button>
+            <button class="toolbar-btn" data-t="image" title="图片">🖼️ 图片</button>
+            <button class="toolbar-btn" data-t="upload" title="上传图片到图床">📤 上传</button>
           </div>
-          <div class="editor-area">
-            <textarea id="ed-content" placeholder="在这里用 Markdown 写作…" spellcheck="false"></textarea>
-            <div class="editor-preview" id="ed-preview"></div>
+          <div class="editor-area" id="ed-area" data-mode="split">
+            <textarea id="ed-content" placeholder="在这里用 Markdown 写作…&#10;&#10;提示：Tab 缩进、Ctrl+B 加粗、Ctrl+K 链接、输入 - 或 1. 后回车可自动续写列表" spellcheck="false"></textarea>
+            <div class="editor-preview typora" id="ed-preview"></div>
           </div>
-          <div class="word-count" id="ed-word-count">0 字</div>
+          <div class="editor-status">
+            <div class="status-left">
+              <span id="ed-stat-words">0 字</span><i>·</i>
+              <span id="ed-stat-chars">0 字符</span><i>·</i>
+              <span id="ed-stat-lines">0 行</span><i>·</i>
+              <span id="ed-stat-pos">第 1 行 第 1 列</span><i>·</i>
+              <span id="ed-stat-save" class="saved">已保存</span>
+            </div>
+            <div class="status-right">
+              <button class="status-btn" id="ed-toggle-side">文章属性</button>
+              <button class="status-btn" id="ed-toggle-outline">大纲</button>
+            </div>
+          </div>
         </div>
+        <aside class="editor-outline" id="ed-outline">
+          <div class="outline-head">大纲</div>
+          <div class="outline-list" id="ed-outline-list"></div>
+        </aside>
       </div>
     </div>
     <input type="file" id="ed-file-input" accept="image/*" style="display:none" multiple />`;
@@ -1826,23 +1864,114 @@ async function renderEditor(container, params) {
 
   const ta = $('#ed-content');
   const preview = $('#ed-preview');
+  const area = $('#ed-area');
+  const bodyEl = $('#ed-body');
+
+  /* ---------- 状态栏 ---------- */
+
+  const countWords = (t) => (String(t).match(/[\u4e00-\u9fa5]/g) || []).length
+    + (String(t).match(/[A-Za-z0-9_'-]+/g) || []).length;
+
+  const updateStatus = () => {
+    const v = ta.value;
+    $('#ed-stat-words').textContent = countWords(v).toLocaleString() + ' 字';
+    $('#ed-stat-chars').textContent = v.length.toLocaleString() + ' 字符';
+    $('#ed-stat-lines').textContent = (v ? v.split('\n').length : 0).toLocaleString() + ' 行';
+    const upto = v.slice(0, ta.selectionStart);
+    const row = upto.split('\n').length;
+    const col = upto.length - upto.lastIndexOf('\n');
+    $('#ed-stat-pos').textContent = `第 ${row} 行 第 ${col} 列`;
+  };
+
+  const markDirty = (d) => {
+    const el = $('#ed-stat-save');
+    el.textContent = d ? '未保存' : '已保存';
+    el.classList.toggle('saved', !d);
+    el.classList.toggle('unsaved', Boolean(d));
+  };
+
+  /* ---------- 大纲（Typora 侧栏） ---------- */
+
+  const renderOutline = () => {
+    const items = [];
+    let inFence = false;
+    String(ta.value).split('\n').forEach((l, idx) => {
+      if (/^\s*(```|~~~)/.test(l)) { inFence = !inFence; return; }
+      if (inFence) return; // 代码块里的 # 不算标题
+      const m = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(l);
+      if (m) items.push({ level: m[1].length, text: m[2], line: idx });
+    });
+    const box = $('#ed-outline-list');
+    if (!items.length) {
+      box.innerHTML = '<div class="outline-empty">还没有标题<br /><span>用 # 写标题后会出现在这里</span></div>';
+      return;
+    }
+    box.innerHTML = items.map((it, i) => `<a class="outline-item lv${it.level}" data-line="${it.line}" data-i="${i}" title="${esc(it.text)}">${esc(it.text)}</a>`).join('');
+    $$('.outline-item', box).forEach((a) => a.addEventListener('click', () => {
+      const line = Number(a.dataset.line);
+      const lines = ta.value.split('\n');
+      const pos = lines.slice(0, line).join('\n').length + (line ? 1 : 0);
+      ta.focus();
+      ta.setSelectionRange(pos, pos + (lines[line] || '').length);
+      const head = preview.querySelectorAll('h1, h2, h3, h4, h5, h6')[Number(a.dataset.i)];
+      if (head) head.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      updateStatus();
+    }));
+  };
+
+  /* ---------- 预览 ---------- */
+
   const renderPreview = () => {
     preview.innerHTML = mdRender(ta.value);
-    $('#ed-word-count').textContent = ta.value.length.toLocaleString() + ' 字符';
+    $$('.ty-copy', preview).forEach((btn) => btn.addEventListener('click', () => {
+      const box = btn.closest('.ty-code');
+      const code = box ? box.querySelector('code') : null;
+      copyText(code ? code.textContent : '');
+    }));
+    renderOutline();
+    updateStatus();
   };
-  ta.addEventListener('input', debounce(renderPreview, 200));
-  renderPreview();
-  $('#ed-preview-toggle').addEventListener('change', () => {
-    preview.classList.toggle('hidden', !$('#ed-preview-toggle').checked);
+
+  /* ---------- 写作模式（源码 / 双栏 / 预览） ---------- */
+
+  const setMode = (mode) => {
+    const m = ['source', 'split', 'preview'].includes(mode) ? mode : 'split';
+    area.dataset.mode = m;
+    $$('#ed-mode button').forEach((b) => b.classList.toggle('active', b.dataset.mode === m));
+    localStorage.setItem('ftm_editor_mode', m);
+    renderPreview();
+  };
+  $$('#ed-mode button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  setMode(localStorage.getItem('ftm_editor_mode') || 'split');
+
+  /* ---------- 侧栏面板开关 ---------- */
+
+  const togglePanel = (name) => {
+    const cls = name === 'side' ? 'hide-side' : 'hide-outline';
+    const hidden = bodyEl.classList.toggle(cls);
+    localStorage.setItem(`ftm_editor_${name}`, hidden ? '1' : '0');
+    $(`#ed-toggle-${name}`).classList.toggle('active', !hidden);
+  };
+  ['side', 'outline'].forEach((name) => {
+    const hidden = localStorage.getItem(`ftm_editor_${name}`) === '1';
+    if (hidden) bodyEl.classList.add(name === 'side' ? 'hide-side' : 'hide-outline');
+    $(`#ed-toggle-${name}`).classList.toggle('active', !hidden);
+    $(`#ed-toggle-${name}`).addEventListener('click', () => togglePanel(name));
   });
 
-  /* 工具栏 */
+  const schedulePreview = debounce(() => { renderPreview(); }, 200);
+  ta.addEventListener('input', () => { markDirty(true); schedulePreview(); });
+  ['click', 'keyup'].forEach((ev) => ta.addEventListener(ev, updateStatus));
+
+  /* ---------- 工具栏 ---------- */
+
   const surround = (before, after) => {
     const s = ta.selectionStart;
     const e = ta.selectionEnd;
     const sel = ta.value.slice(s, e) || '文字';
     ta.setRangeText(before + sel + after, s, e, 'end');
     ta.focus();
+    markDirty(true);
     renderPreview();
   };
   const prefixLines = (prefix) => {
@@ -1852,11 +1981,70 @@ async function renderEditor(container, params) {
     const lines = (sel || '列表项').split('\n').map((l) => prefix + l).join('\n');
     ta.setRangeText(lines, s, e, 'end');
     ta.focus();
+    markDirty(true);
     renderPreview();
   };
+
+  /* Typora 风格编辑行为：Tab 缩进、回车续写列表、Ctrl+B/I/K/E */
+  ta.addEventListener('keydown', (e) => {
+    const s = ta.selectionStart;
+    const en = ta.selectionEnd;
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const lineStart = ta.value.lastIndexOf('\n', s - 1) + 1;
+      const nl = ta.value.indexOf('\n', en);
+      const lineEnd = nl === -1 ? ta.value.length : nl;
+      const block = ta.value.slice(lineStart, lineEnd);
+      if (e.shiftKey) {
+        ta.setRangeText(block.split('\n').map((l) => l.replace(/^ {1,4}/, '')).join('\n'), lineStart, lineEnd, 'end');
+      } else if (s === en) {
+        ta.setRangeText('    ', s, en, 'end');
+      } else {
+        ta.setRangeText(block.split('\n').map((l) => `    ${l}`).join('\n'), lineStart, lineEnd, 'end');
+      }
+      markDirty(true);
+      renderPreview();
+      return;
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey && s === en) {
+      const lineStart = ta.value.lastIndexOf('\n', s - 1) + 1;
+      const line = ta.value.slice(lineStart, s);
+      const m = /^(\s*)(>\s?|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)(.*)$/.exec(line);
+      if (m) {
+        e.preventDefault();
+        const indent = m[1];
+        const marker = m[2];
+        const rest = m[3];
+        if (!rest.trim()) { // 空列表项 → 结束列表（Typora 行为）
+          ta.setRangeText('', lineStart, s, 'end');
+        } else {
+          let next = marker;
+          const ol = /^(\d+)([.)])\s+$/.exec(marker);
+          if (ol) next = `${Number(ol[1]) + 1}${ol[2]} `;
+          if (/^[-*+]\s+\[[ xX]\]\s+$/.test(marker)) next = `${marker.slice(0, marker.indexOf('['))}[ ] `;
+          ta.setRangeText(`\n${indent}${next}`, s, en, 'end');
+        }
+        markDirty(true);
+        renderPreview();
+        return;
+      }
+    }
+
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      const k = e.key.toLowerCase();
+      if (k === 'b') { e.preventDefault(); surround('**', '**'); return; }
+      if (k === 'i') { e.preventDefault(); surround('*', '*'); return; }
+      if (k === 'k') { e.preventDefault(); surround('[', '](https://)'); return; }
+      if (k === 'e') { e.preventDefault(); surround('`', '`'); return; }
+    }
+  });
+
   $$('.toolbar-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       switch (btn.dataset.t) {
+        case 'h1': prefixLines('# '); break;
         case 'h2': prefixLines('## '); break;
         case 'h3': prefixLines('### '); break;
         case 'bold': surround('**', '**'); break;
@@ -1869,6 +2057,7 @@ async function renderEditor(container, params) {
         case 'image': surround('![', '](https://)'); break;
         case 'ul': prefixLines('- '); break;
         case 'ol': prefixLines('1. '); break;
+        case 'task': prefixLines('- [ ] '); break;
         case 'table': surround('\n| 列1 | 列2 |\n| --- | --- |\n| 内容 | 内容 |\n', ''); break;
         case 'hr': surround('\n---\n\n', ''); break;
         case 'upload': $('#ed-file-input').click(); break;
@@ -1889,6 +2078,7 @@ async function renderEditor(container, params) {
         const s = ta.selectionStart;
         ta.setRangeText(md + '\n', s, s, 'end');
         toast('上传成功，已插入图片', 'ok');
+        markDirty(true);
         renderPreview();
       } catch (err) {
         toast(err.message, 'error');
@@ -1968,6 +2158,7 @@ async function renderEditor(container, params) {
           method: 'PUT',
           body: JSON.stringify({ ...payload, scope: scopeNow }),
         });
+        markDirty(false);
         toast('保存成功' + GH_HINT, 'ok');
         navigate(`#/${scopeNow === 'drafts' ? 'drafts' : 'posts'}`);
       } else {
@@ -1975,6 +2166,7 @@ async function renderEditor(container, params) {
           method: 'POST',
           body: JSON.stringify({ ...payload, scope: asDraft ? 'drafts' : 'posts' }),
         });
+        markDirty(false);
         toast((asDraft ? '已保存为草稿' : '文章创建成功') + GH_HINT, 'ok');
         loadNavBadges();
         navigate(`#/${asDraft ? 'drafts' : 'posts'}`);

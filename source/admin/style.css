@@ -838,93 +838,288 @@ input, textarea, select { font-family: inherit; font-size: 14px; color: var(--te
 .post-title-cell .sticky-flag { color: var(--warn); font-size: 12px; margin-right: 4px; }
 .meta-cell { min-width: 120px; }
 
-/* ============ 编辑器 ============ */
+/* ============ 编辑器（Typora 风格） ============ */
 
-.editor-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px 20px; }
-.editor-head .btn { margin-left: auto; }
+.editor-card { overflow: hidden; }
+
+.editor-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.editor-head .btn { margin-left: 0; }
+.editor-head h3 { margin: 0; font-size: 15px; }
+.editor-actions { display: flex; gap: 8px; margin-left: auto; }
+
+/* 模式切换（源码 / 双栏 / 预览） */
+.ty-mode { display: inline-flex; gap: 2px; padding: 3px; background: #f1f2f7; border-radius: 10px; margin-left: auto; }
+.ty-mode button {
+  border: none;
+  background: transparent;
+  padding: 5px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.ty-mode button:hover { color: var(--brand); }
+.ty-mode button.active { background: #fff; color: var(--brand); box-shadow: var(--shadow-sm); }
 
 .editor-body {
-  padding: 20px;
-  display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 20px;
-  align-items: start;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-height: 620px;
 }
 
-.editor-side { display: flex; flex-direction: column; gap: 14px; }
-.editor-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* 左侧：文章属性 */
+.editor-side {
+  flex: 0 0 300px;
+  width: 300px;
+  padding: 18px 18px 40px;
+  border-right: 1px solid var(--border);
+  background: #fcfcfe;
+  overflow-y: auto;
+  max-height: 76vh;
+}
+.editor-body.hide-side .editor-side { display: none; }
+.side-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 12px; }
+
+/* 右侧：大纲（Typora 侧栏） */
+.editor-outline {
+  flex: 0 0 220px;
+  width: 220px;
+  border-left: 1px solid var(--border);
+  background: #fcfcfe;
+  padding: 16px 12px 40px;
+  overflow-y: auto;
+  max-height: 76vh;
+}
+.editor-body.hide-outline .editor-outline { display: none; }
+.outline-head { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--muted); margin: 0 6px 10px; }
+.outline-list { display: flex; flex-direction: column; }
+.outline-item {
+  display: block;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: #4c5060;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-left: 2px solid transparent;
+}
+.outline-item:hover { background: var(--brand-soft); color: var(--brand); }
+.outline-item.lv1 { font-weight: 700; }
+.outline-item.lv2 { padding-left: 16px; }
+.outline-item.lv3 { padding-left: 26px; font-size: 12px; }
+.outline-item.lv4, .outline-item.lv5, .outline-item.lv6 { padding-left: 36px; font-size: 12px; color: var(--muted); }
+.outline-empty { color: var(--muted); font-size: 12px; padding: 10px 8px; line-height: 1.8; }
+.outline-empty span { font-size: 11.5px; opacity: 0.8; }
+
+/* 中间：工具栏 + 写作区 + 状态栏 */
+.editor-main { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
 
 .editor-toolbar {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   flex-wrap: wrap;
-  padding: 8px 10px;
-  background: #f8f9fc;
-  border: 1px solid var(--border);
-  border-bottom: none;
-  border-radius: 12px 12px 0 0;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: #fff;
 }
+.toolbar-sep { width: 1px; height: 18px; background: var(--border); margin: 0 6px; }
 
 .toolbar-btn {
-  padding: 5px 9px;
+  padding: 5px 10px;
   border: none;
   border-radius: 7px;
   background: transparent;
   color: #4c5060;
-  font-size: 13px;
+  font-size: 12.5px;
   transition: background 0.15s ease, color 0.15s ease;
 }
-
 .toolbar-btn:hover { background: var(--brand-soft); color: var(--brand); }
 
 .editor-area {
-  display: flex;
-  border: 1px solid var(--border);
-  border-radius: 0 0 12px 12px;
-  overflow: hidden;
-  min-height: 460px;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 520px;
+  background: #fff;
 }
 
 .editor-area textarea {
-  flex: 1;
   border: none;
   outline: none;
   resize: none;
-  padding: 16px 18px;
+  padding: 28px 32px 60px;
   font-family: "JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace;
-  font-size: 13.5px;
-  line-height: 1.75;
-  background: #fff;
+  font-size: 14px;
+  line-height: 1.9;
+  background: #fcfcfe;
+  overflow-y: auto;
+  tab-size: 4;
 }
 
 .editor-preview {
-  flex: 1;
-  padding: 16px 22px;
+  padding: 28px 36px 60px;
   overflow-y: auto;
   border-left: 1px solid var(--border);
   background: #fff;
-  font-size: 14px;
 }
 
-.editor-preview.hidden { display: none; }
+/* 三种模式 */
+.editor-area[data-mode="split"] { grid-template-columns: 1fr 1fr; }
+.editor-area[data-mode="source"] { grid-template-columns: minmax(0, 900px); justify-content: center; background: #fcfcfe; }
+.editor-area[data-mode="source"] .editor-preview { display: none; }
+.editor-area[data-mode="source"] textarea { border-left: none; }
+.editor-area[data-mode="preview"] { grid-template-columns: minmax(0, 900px); justify-content: center; }
+.editor-area[data-mode="preview"] textarea { display: none; }
+.editor-area[data-mode="preview"] .editor-preview { border-left: none; }
 
-.editor-preview h1, .editor-preview h2, .editor-preview h3, .editor-preview h4 { line-height: 1.4; }
-.editor-preview h1 { font-size: 22px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
-.editor-preview h2 { font-size: 19px; }
-.editor-preview h3 { font-size: 16.5px; }
-.editor-preview img { max-width: 100%; border-radius: 8px; }
-.editor-preview pre { background: #1e1f26; color: #e6e8ef; padding: 14px 16px; border-radius: 10px; overflow-x: auto; font-size: 13px; }
-.editor-preview code { font-family: "JetBrains Mono", "Fira Code", Consolas, monospace; }
-.editor-preview p code, .editor-preview li code { background: var(--brand-soft); color: var(--brand); padding: 1px 6px; border-radius: 5px; font-size: 0.9em; }
-.editor-preview blockquote { margin: 10px 0; padding: 8px 16px; border-left: 3px solid var(--brand); background: #fafbfd; border-radius: 0 8px 8px 0; color: #555a6b; }
-.editor-preview table { border-collapse: collapse; width: 100%; margin: 10px 0; }
-.editor-preview th, .editor-preview td { border: 1px solid var(--border); padding: 6px 10px; }
-.editor-preview th { background: #f8f9fc; }
-.editor-preview ul, .editor-preview ol { padding-left: 24px; }
-.editor-preview a { color: var(--brand); }
-.editor-preview hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+/* 状态栏 */
+.editor-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 14px;
+  border-top: 1px solid var(--border);
+  background: #fbfbfe;
+  color: var(--muted);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.status-left { display: flex; align-items: center; gap: 6px; }
+.status-left i { font-style: normal; opacity: 0.45; }
+.status-right { display: flex; align-items: center; gap: 6px; }
+.status-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 7px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.status-btn:hover { color: var(--brand); background: var(--brand-soft); }
+.status-btn.active { color: var(--brand); border-color: rgba(211, 18, 45, 0.22); background: var(--brand-soft); }
+#ed-stat-save.saved { color: var(--ok); }
+#ed-stat-save.unsaved { color: var(--warn); font-weight: 600; }
 
-.word-count { color: var(--muted); font-size: 12px; text-align: right; }
+/* ---------- Typora 正文排版 ---------- */
+
+.typora {
+  font-size: 16px;
+  line-height: 1.75;
+  color: #1f2328;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", "Helvetica Neue", sans-serif;
+  word-wrap: break-word;
+}
+.typora > *:first-child { margin-top: 0; }
+.typora h1, .typora h2, .typora h3, .typora h4, .typora h5, .typora h6 {
+  margin: 1.6em 0 0.6em;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #16181d;
+}
+.typora h1 { font-size: 1.85em; padding-bottom: 0.3em; border-bottom: 1px solid #eaecef; }
+.typora h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid #eaecef; }
+.typora h3 { font-size: 1.25em; }
+.typora h4 { font-size: 1.05em; }
+.typora h5, .typora h6 { font-size: 0.95em; color: #6a737d; }
+.typora p { margin: 0.9em 0; }
+.typora a { color: #0969da; text-decoration: none; }
+.typora a:hover { text-decoration: underline; }
+.typora strong { font-weight: 600; }
+.typora em { font-style: italic; }
+.typora del { color: #6a737d; }
+.typora ul, .typora ol { margin: 0.9em 0; padding-left: 2em; }
+.typora li { margin: 0.3em 0; }
+.typora ul { list-style: disc; }
+.typora ol { list-style: decimal; }
+.typora li > ul, .typora li > ol { margin: 0.2em 0; }
+
+.typora blockquote {
+  margin: 1em 0;
+  padding: 0.2em 1em;
+  color: #6a737d;
+  border-left: 3px solid #d0d7de;
+  background: transparent;
+}
+.typora blockquote > p { margin: 0.6em 0; }
+
+.typora code {
+  font-family: "JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace;
+  font-size: 0.88em;
+  background: rgba(175, 184, 193, 0.22);
+  padding: 0.18em 0.4em;
+  border-radius: 4px;
+  color: #cf222e;
+}
+.typora .ty-code { margin: 1.1em 0; border-radius: 10px; overflow: hidden; background: #f6f8fa; border: 1px solid #e6e8ec; }
+.typora .ty-code-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  color: #6a737d;
+  background: #eef0f4;
+  border-bottom: 1px solid #e6e8ec;
+}
+.typora .ty-code-lang { letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
+.typora .ty-copy {
+  border: 1px solid #d8dbe2;
+  background: #fff;
+  color: #57606a;
+  font-size: 11.5px;
+  padding: 2px 10px;
+  border-radius: 6px;
+}
+.typora .ty-copy:hover { border-color: var(--brand); color: var(--brand); }
+.typora pre { margin: 0; padding: 14px 16px; overflow-x: auto; background: #f6f8fa; }
+.typora pre code { background: none; padding: 0; color: #24292f; font-size: 13px; line-height: 1.6; }
+
+.typora table { border-collapse: collapse; margin: 1.1em 0; display: block; overflow-x: auto; }
+.typora th, .typora td { border: 1px solid #d0d7de; padding: 6px 13px; }
+.typora th { background: #f6f8fa; font-weight: 600; }
+.typora tr:nth-child(2n) td { background: #f9fafb; }
+
+.typora img { max-width: 100%; border-radius: 8px; display: block; margin: 1.1em auto; box-shadow: 0 2px 12px -4px rgba(20, 24, 40, 0.22); }
+.typora hr { border: none; border-top: 1px solid #e7e9ee; margin: 2em 0; }
+.typora kbd {
+  border: 1px solid #d0d7de;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 0.85em;
+  background: #f6f8fa;
+}
+.typora .ty-task-list { list-style: none; padding-left: 0.2em; }
+.typora .ty-task { display: flex; align-items: flex-start; gap: 8px; }
+.typora .ty-task input { margin-top: 0.42em; accent-color: var(--brand); }
+.typora .ty-task.done > span { color: #8b949e; text-decoration: line-through; }
+
+/* 窄屏：默认收起大纲，双栏自动变上下 */
+@media (max-width: 1180px) {
+  .editor-outline { display: none; }
+  .editor-area[data-mode="split"] { grid-template-columns: 1fr; }
+  .editor-area[data-mode="split"] .editor-preview { border-left: none; border-top: 1px solid var(--border); }
+}
+@media (max-width: 900px) {
+  .editor-body { flex-direction: column; }
+  .editor-side { flex: none; width: auto; border-right: none; border-bottom: 1px solid var(--border); max-height: none; }
+  .editor-body.hide-side .editor-side { display: none; }
+}
 
 /* chips 输入 */
 

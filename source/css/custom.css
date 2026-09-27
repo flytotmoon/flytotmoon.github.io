@@ -549,7 +549,7 @@ body {
 }
 
 .ftm-admin-btn:hover svg {
-  transform: rotate(90deg);
+  transform: scale(1.14);
   opacity: 1;
   color: var(--anzhiyu-main);
 }

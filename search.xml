@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search> 
+  
+  
+    
+    <entry>
+      <title>flytotmoon 博客后台管理系统介绍</title>
+      <link href="/2026/08/26/%E7%BD%91%E7%BB%9C%E6%8A%80%E6%9C%AF/flytotmoon%20%E5%8D%9A%E5%AE%A2%E5%90%8E%E5%8F%B0%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F%E4%BB%8B%E7%BB%8D/"/>
+      <url>/2026/08/26/%E7%BD%91%E7%BB%9C%E6%8A%80%E6%9C%AF/flytotmoon%20%E5%8D%9A%E5%AE%A2%E5%90%8E%E5%8F%B0%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F%E4%BB%8B%E7%BB%8D/</url>
+      
+        <content type="html"><![CDATA[<h1 id="flytotmoon-博客后台管理系统介绍">flytotmoon博客后台管理系统介绍</h1><blockquote><p>为 Hexo + AnZhiYu 博客「飞向月球」量身打造的在线内容管理系统（CMS）。一个界面，两种模式：<strong>本机 Node 服务</strong> 与 <strong>GitHub云端</strong>，覆盖博客全部内容板块，保存即自动发布。</p></blockquote><hr><h2 id="一一句话概括">一、一句话概括</h2><p>以前写博客要开电脑、改Markdown、跑命令、部署；现在<strong>打开浏览器就能管理整个博客</strong>——写文章、发说说、传照片、更新友链、改自我介绍，点「保存」，约2~5 分钟后自动上线。</p><hr><h2 id="二核心亮点">二、核心亮点</h2><table><colgroup><col style="width: 50%"><col style="width: 50%"></colgroup><thead><tr><th>亮点</th><th>说明</th></tr></thead><tbody><tr><td>🌐 <strong>在线化</strong></td><td>后台页面随博客发布到<code>/admin/</code>，任何设备、任何浏览器都能管理，无需安装任何软件</td></tr><tr><td>☁️ <strong>零服务器成本</strong></td><td>GitHub 云端模式直接调用 GitHub 仓库 API，配合 Actions自动构建，不需要租服务器</td></tr><tr><td>💾 <strong>保存即发布</strong></td><td>每次保存自动提交 → 自动触发 GitHub Actions 构建 →自动部署到博客，全程无需手动操作</td></tr><tr><td>🖥️ <strong>本地也能用</strong></td><td>保留本机模式：一个零依赖的 Node 服务，直接读写本地文件，构建日志 SSE实时推送</td></tr><tr><td>✍️ <strong>Typora 风格写作</strong></td><td>源码 / 双栏 / 预览三种模式、大纲侧栏、状态栏、Typora式排版与编辑习惯</td></tr><tr><td>🖼️ <strong>PicGo 风格图床</strong></td><td>三种图床一键切换、拖拽与 <code>Ctrl+V</code>粘贴上传、云端相册自动翻页读取全部图片</td></tr><tr><td>🧩 <strong>全板块覆盖</strong></td><td>文章、草稿、说说、相册、自我介绍、友链、装备、创意、媒体库、配置、构建，一站式管理</td></tr><tr><td>🛡️ <strong>安全设计</strong></td><td>细粒度令牌仅存浏览器本地；路径校验防穿越；删除入回收站；配置修改自动备份</td></tr><tr><td>🧪 <strong>质量保障</strong></td><td>101 项回归测试全通过（含真跑前端 Markdown渲染器）；解析器与图床模块双端共用，读写往返无损</td></tr></tbody></table><hr><h2 id="三双模式架构">三、双模式架构</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────┐        ┌──────────────────────────────┐</span><br><span class="line">│        本机模式               │        │        GitHub 云端模式         │</span><br><span class="line">│  浏览器 http://127.0.0.1:4321│        │  浏览器 blog.flytotmoon.cn/   │</span><br><span class="line">│            │                 │        │          admin/               │</span><br><span class="line">│            ▼                 │        │            │                  │</span><br><span class="line">│   Node 服务（admin/server.js）│        │  直接调用 GitHub REST API     │</span><br><span class="line">│   零第三方依赖 · scrypt口令   │        │  （Contents / Actions）       │</span><br><span class="line">│   HMAC 令牌 · 登录限流       │        │            │                  │</span><br><span class="line">│            │                 │        │            ▼                  │</span><br><span class="line">│            ▼                 │        │   flytotmoon/flytotmoon.     │</span><br><span class="line">│   本地文件 source/_posts…    │        │   github.io 仓库 source 分支   │</span><br><span class="line">│   hexo generate / deploy     │        │            │                  │</span><br><span class="line">│   （SSE 实时日志）            │        │            ▼                  │</span><br><span class="line">└─────────────────────────────┘        │   GitHub Actions 自动构建       │</span><br><span class="line">                                        │   产物推送 master（Pages）      │</span><br><span class="line">                                        └──────────────────────────────┘</span><br></pre></td></tr></table></figure><p><strong>自动发布链路（云端）</strong>：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">保存 → 提交到 source 分支 → push 事件触发 Actions</span><br><span class="line">     → npm ci → 安装 pandoc → hexo clean &amp;&amp; generate</span><br><span class="line">     → 产物推送 master 分支 → GitHub Pages 更新（约 2~5 分钟）</span><br></pre></td></tr></table></figure><hr><h2 id="四功能全景">四、功能全景</h2><h3 id="文章管理">📝 文章管理</h3><ul><li>新建 / 编辑 / 删除（本机模式入回收站，云端模式可经 Git历史找回）</li><li>完整 Front-matter支持：标题、日期、分类、标签、封面、摘要、置顶、数学公式、评论开关</li><li>搜索、分类/标签筛选、分页；标题改名自动重命名文件</li></ul><h3 id="草稿箱">📄 草稿箱</h3><ul><li>草稿独立管理（<code>_drafts</code>，不会被发布）；一键「发布」转为正式文章</li></ul><h3 id="markdown-编辑器typora-风格">✍️ Markdown 编辑器（Typora风格）</h3><ul><li><strong>三种写作模式</strong>（记忆上次选择）：<code>源码</code>（居中单栏纯Markdown）、<code>双栏</code>（源码 +实时预览）、<code>预览</code>（整洁排版的阅读/校对视图）</li><li><strong>大纲侧栏</strong>：自动列出各级标题并按层级缩进（自动跳过代码块里的<code>#</code>），点击即跳到源码对应行并滚动预览</li><li><strong>状态栏</strong>：字数 / 字符 / 行数 / 光标行列 + 「已保存 /未保存」；右下角可折叠「文章属性」与「大纲」</li><li><strong>Typora式排版</strong>：标题下边框、引用左侧细线、行内代码粉底、代码块带语言标签与复制按钮、表格斑马纹、图片居中带阴影、任务列表真实复选框</li><li><strong>Typora 式编辑习惯</strong>：<code>Tab</code> /<code>Shift+Tab</code> 整段缩进、回车自动续写 <code>-</code><code>1.</code> <code>&gt;</code><code>- [ ]</code>（空条目回车即退出列表）、<code>Ctrl+B/I/K/E</code>、<code>Ctrl+S</code>保存</li><li>工具栏分组：H1~H3 · 加粗/斜体/删除线/行内代码 ·引用/列表/任务/代码块/表格/分割线 · 链接/图片/上传</li><li>布局细节：编辑器占满可视区，属性栏、大纲、写作区<strong>各自内部滚动</strong>，鼠标滚动不会带动整页</li></ul><h3 id="千言万语即刻短文">💬 千言万语（即刻短文）</h3><ul><li>YAML 编辑 + 博客同款卡片实时预览 + 保存前格式检查</li><li><strong>新条目插入到列表最前面</strong>（主题按文件顺序渲染，最新的自然排在最上面，且不受<code>limit</code> 截断）；插入后自动选中占位文字，直接改写即可</li></ul><h3 id="相册集">🖼️ 相册集</h3><ul><li>相册分组管理（瀑布流/画廊两种模式），封面与照片缩略图预览，一键新建相册模板</li></ul><h3 id="自我介绍">👤 自我介绍</h3><ul><li>关于页 20个板块（头像技能/书本/人格/座右铭/游戏/读书/打赏等）的分区概览编辑</li></ul><h3 id="友链管理">🔗 友链管理</h3><ul><li>分组 + 三种卡片样式（flexcard/telescopic/anzhiyu）+推荐/标签徽标预览</li></ul><h3 id="我的装备">🎒 我的装备</h3><ul><li>分类 → 好物 → 设备三级结构的卡片预览编辑</li></ul><h3 id="创意技能">⭐ 创意技能</h3><ul><li>音乐墙图标网格预览编辑</li></ul><h3 id="媒体库picgo-风格云图库">📁 媒体库（PicGo 风格云图库）</h3><ul><li><strong>拖拽 / 点击 / <code>Ctrl+V</code>粘贴</strong>三种上传方式，多选上传带进度条，上传后可自动复制 Markdown引用</li><li><strong>三种图床一键切换</strong>：<ul><li><code>GitHub 仓库</code>：存<code>source/img/upload/</code>，零配置随站发布</li><li><code>阿里云 OSS</code>：AccessKey + Bucket +Endpoint，可绑自定义域名 / CDN，浏览器直传</li><li><code>自定义接口</code>：Chevereto / EasyImages /自建服务，支持自定义字段名、请求头与 URL 提取正则</li></ul></li><li><strong>云相册</strong>：直接列出当前图床的图片。OSS 走 ListObjects并<strong>自动翻页读取目录下全部图片</strong>（默认上限 2000张），支持文件名搜索、分批渲染「显示更多」、悬停复制 Markdown / 复制链接/ 预览 / 删除<ul><li>读取范围由「存储目录前缀」决定：填 <code>img</code> 就读取<code>img/</code> 下所有图片（上传也放进去），留空读整个 Bucket</li><li>「上传时按月建子目录」可关闭，让新图与已有的<code>img/xxx.jpg</code> 保持同一层</li></ul></li><li><strong>一键测试上传</strong>：用一张 1×1测试图验证图床配置；「最近上传记录」保存在浏览器，自定义图床也能找回地址</li><li><strong>容错与诊断</strong>：Endpoint 只填地域名会自动补全、误带<code>https://</code> 或 Bucket 前缀会自动纠正；AccessKey里的空格换行自动清洗并校验长度；出错时给出<strong>完整可复制的诊断面板</strong>（本机签名串/ OSS 期望签名串 / RequestId）</li></ul><h3 id="站点设置">⚙️ 站点设置</h3><ul><li>可视化修改站点信息；高级模式直接编辑 <code>_config.yml</code> /<code>_config.anzhiyu.yml</code>（自动备份 / Git 历史即备份）</li><li>本机模式支持修改后台密码</li></ul><h3 id="构建发布">🚀 构建发布</h3><ul><li>本机模式：hexo clean / generate / deploy 一键执行，SSE实时日志流，可取消</li><li>云端模式：触发 GitHubActions，状态自动轮询（构建结束自动停止轮询，节省 API 配额）</li></ul><h3 id="仪表盘">📊 仪表盘</h3><ul><li>文章/草稿/分类/标签/字数统计、分类分布条、标签云、最近文章、快捷操作</li></ul><hr><h2 id="五快速上手">五、快速上手</h2><h3 id="本机模式">本机模式</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm run admin          <span class="comment"># 启动，浏览器打开 http://127.0.0.1:4321/</span></span><br></pre></td></tr></table></figure><p>默认账号 <code>admin / admin123</code>（登录后请立即修改密码）。</p><h3 id="github-云端模式">GitHub 云端模式</h3><ol type="1"><li>源码推送至仓库 <code>source</code> 分支（<code>master</code>留给构建产物）</li><li>创建 GitHub 细粒度令牌：<strong>Contents: Read and write</strong> +<strong>Workflows: Read and write</strong>，仅授权该仓库</li><li>打开 <code>https://blog.flytotmoon.cn/admin/</code> → 「GitHub云端」→ 填令牌与仓库 → <strong>连接测试</strong> → 进入后台</li></ol><h3 id="配置阿里云-oss-图床可选">配置阿里云 OSS 图床（可选）</h3><ol type="1"><li>「媒体库」→「图床设置」→ 选 <strong>阿里云 OSS</strong>，填<code>AccessKey ID</code>、<code>AccessKey Secret</code>、<code>Bucket</code>、<code>Endpoint</code>（如<code>oss-cn-beijing.aliyuncs.com</code>）</li><li>「存储目录前缀」填图片所在目录，例如 <code>img</code> ——既决定上传位置，也决定云相册的读取范围</li><li>「上传时按月建子目录」按需开关：想让新图和已有的<code>img/xxx.jpg</code> 放在同一层就关掉</li><li><strong>云端模式</strong>还需给 Bucket 配置跨域规则（CORS）：来源填<code>https://blog.flytotmoon.cn</code>，允许方法勾全<code>PUT/POST/GET/HEAD/DELETE</code>，允许 Headers 填<code>*</code>；本机模式由服务端代签名，无需 CORS</li><li>点「测试上传」验证；通过后拖拽或 <code>Ctrl+V</code>粘贴图片即可，上传完 Markdown 自动进剪贴板</li></ol><blockquote><p>建议使用 RAM 子账号，只授予该 Bucket 的<code>oss:PutObject</code>、<code>oss:GetObject</code>、<code>oss:ListObjects</code>、<code>oss:DeleteObject</code>权限；密钥只保存在本机配置或浏览器本地，不会写入仓库。</p></blockquote><hr><h2 id="六技术特点">六、技术特点</h2><ul><li><strong>零第三方依赖</strong>：本机服务仅用 Node 内置模块（http /crypto / fs / child_process），单文件可运行</li><li><strong>双端共用解析器</strong>：<code>fm.js</code> 同时运行在 Node服务端与浏览器端，front-matter解析/回写完全一致，读写往返无损（含无缩进列表等非标写法）</li><li><strong>双端共用图床模块</strong>：<code>storage.js</code>同样一套代码跑两端（浏览器用 WebCrypto、Node 用 crypto），内置阿里云 OSSV1 签名直传、自定义接口上传与云相册列举</li><li><strong>浏览器直传 OSS 的签名方案</strong>：浏览器的<code>fetch</code> 禁止脚本设置 <code>Date</code>请求头（会被静默丢弃），因此改用 OSS 支持的<code>x-oss-date</code>；并且签名约定（哪些子资源参与签名、值是否编码、<code>x-oss-date</code>是否计入签名头）由 OSS返回的「期望签名串」<strong>自动学习</strong>并在后续请求中复用</li><li><strong>前端 Markdown渲染器自带测试</strong>：预览渲染器在单元测试里被放入沙箱真跑，任务列表、代码块、转义、表格等行为都有断言保护</li><li><strong>视图容器隔离</strong>：每次切换视图都换一个全新的<code>#page-container</code>，旧容器隐藏保留片刻——迟到的异步渲染落在旧容器里，既不报错也不会串到新页面</li><li><strong>登录安全</strong>：scrypt 口令哈希 + HMAC 签名令牌（7天有效期）+ 登录失败限流</li><li><strong>细粒度令牌</strong>：云端模式令牌只保存在浏览器localStorage，页面公开但无令牌无法操作</li><li><strong>防限流优化</strong>：目录树缓存 120s、统计缓存60s、构建完成自动停止轮询、限流错误中文提示</li><li><strong>防缓存策略</strong>：资源带版本号（<code>?v=x.y.z</code>）+登录页版本标识，避免旧版缓存困扰</li><li><strong>格式安全</strong>：YAML类数据页保存前做解析检查，格式错误时二次确认，防止博客构建失败</li><li><strong>回归测试</strong>：<code>node admin/test-api.js</code> 覆盖101 项断言，含 OSS 签名向量、分页、二进制解码、前端渲染器等</li></ul><hr><h2 id="七版本演进">七、版本演进</h2><table><colgroup><col style="width: 50%"><col style="width: 50%"></colgroup><thead><tr><th>版本</th><th>内容</th></tr></thead><tbody><tr><td>v1.0.0</td><td>本机模式：认证、文章/草稿、媒体、设置、构建（SSE 日志），33 项 API测试</td></tr><tr><td>v1.2.0</td><td>GitHub 云端模式上线：/admin 在线后台、Actions 自动构建部署</td></tr><tr><td>v1.3.0</td><td>资源版本号防缓存 + 版本标识</td></tr><tr><td>v1.4.0</td><td>UI 全新重设计（深空分屏登录、渐变侧边栏）+ 修复 hexo主题布局污染（skip_render）</td></tr><tr><td>v1.4.1</td><td>API 调用频率优化 + 限流中文提示</td></tr><tr><td>v1.4.2</td><td>保存即自动发布的提示文案修正</td></tr><tr><td>v1.5.0</td><td>千言万语集成</td></tr><tr><td>v1.5.1</td><td>相册集集成</td></tr><tr><td>v1.5.2</td><td>自我介绍集成</td></tr><tr><td>v1.6.0</td><td>友链 / 装备 / 创意技能全部集成（45 项 API 测试全通过）</td></tr><tr><td>v1.6.x</td><td>交互细节打磨（编辑器焦点、置顶优先级、媒体删除缓存等）</td></tr><tr><td>v1.7.0</td><td>媒体库升级为 <strong>PicGo 风格云图库</strong>：三种图床切换（GitHub/ 阿里云 OSS / 自定义接口）、拖拽与 Ctrl+V粘贴上传、云相册浏览、自动复制 Markdown（63 项 API 测试全通过）</td></tr><tr><td>v1.7.1</td><td>修复云端模式删除图片报<code>URI malformed</code>（二进制文件被当成文本解码，删除静默失败）</td></tr><tr><td>v1.7.2</td><td>千言万语「添加新条目」改为插入到列表最前面，并自动选中占位文字</td></tr><tr><td>v1.7.3</td><td>OSS Endpoint 自动纠错（只填地域名 / 多带协议或 Bucket前缀），上传失败给出可排查的中文提示</td></tr><tr><td>v1.7.4</td><td>OSS 改用 <code>x-oss-date</code> 签名，修复浏览器直传 403<code>requires a valid Date</code></td></tr><tr><td>v1.7.5</td><td>OSS密钥自动清洗（空格/换行/引号）与长度校验；签名不匹配时给出完整诊断信息</td></tr><tr><td>v1.8.0</td><td>云相册<strong>自动翻页</strong>读取 OSS 目录下全部图片（默认 2000张）；前缀按目录语义、上传目录可平铺；相册分批渲染</td></tr><tr><td>v1.8.1</td><td>OSS 签名约定<strong>自适应</strong>：用 OSS返回的期望签名串重签重放并学习，错误改为完整可复制的诊断面板</td></tr><tr><td>v1.8.2</td><td>修复快速切换视图时迟到异步渲染报<code>querySelectorAll of null</code>（每个视图使用独立容器）</td></tr><tr><td>v1.9.0</td><td>文章编辑器改造为 <strong>Typora风格</strong>：三种写作模式、大纲侧栏、状态栏、Typora式排版与编辑习惯</td></tr><tr><td>v1.9.1</td><td>修复编辑器中滚动时「文章属性 /大纲」跟着整页滚动（三栏各自内部滚动）</td></tr></tbody></table><hr><h2 id="八踩坑记浏览器直传对象存储">八、踩坑记（浏览器直传对象存储）</h2><p>把「图床」做进纯前端后台，踩了一串坑，记下来给以后的自己：</p><ol type="1"><li><strong>跨域（CORS）</strong>：浏览器直传 OSS 前，必须给 Bucket配置跨域规则：来源填站点域名、允许方法<code>PUT/POST/GET/HEAD/DELETE</code>、允许 Headers 填<code>*</code>。没配时前端只能看到<code>Failed to fetch</code>，看不出原因——所以「把网络错误翻译成人话」很有必要。</li><li><strong><code>Date</code> 请求头被浏览器禁止</strong>：JS 通过<code>fetch</code> 设置的 <code>Date</code> 属于 forbiddenheader，会被静默丢弃，OSS 于是回<code>403 AccessDenied: OSS authentication requires a valid Date</code>。解法是改用<code>x-oss-date</code>（它同时作为签名串里的时间戳并计入<code>CanonicalizedOSSHeaders</code>）。</li><li><strong>签名串的细节差异</strong>：即使算法和官方 SDK逐字符一致，不同实现/区域对「哪些子资源参与签名、值用原文还是 URL编码」仍可能不同，表现为<code>SignatureDoesNotMatch</code>。最终的稳妥做法是：<strong>OSS会在错误响应里原样返回它期望的签名串</strong>，直接用它重签一次即可，同时从中反推约定供后续请求复用。</li><li><strong>Endpoint 与密钥的手滑</strong>：<code>oss-cn-beijing</code>少了 <code>.aliyuncs.com</code>、密钥复制多一个空格或换行、误把AccessKey ID 当Secret——这几种错误都会表现为「签名不匹配」，所以在保存时做归一化与长度校验，比事后排查省事得多。</li><li><strong>列举要翻页</strong>：<code>ListObjects</code> 单次最多 1000个对象，且 V1 在不带 <code>delimiter</code> 时<strong>不返回<code>NextMarker</code></strong>，要用本页最后一个 <code>Key</code>当下一页的 <code>marker</code>。</li><li><strong>别把二进制当文本读</strong>：云端删除图片时若先读文件内容拿<code>sha</code>，用 <code>decodeURIComponent(escape(atob(...)))</code>解码图片会抛 <code>URI malformed</code>，删除请求根本发不出去。</li><li><strong>列表缓存与「删不掉」的错觉</strong>：写入后必须让目录树缓存失效，前端再做一次乐观移除，否则界面看起来「删了还在」。</li><li><strong>GitHub Pages的缓存</strong>：推送成功但线上还是旧版，除了资源加<code>?v=x.y.z</code>，也可能是 Pages没有重建——推一个空提交触发一次即可。</li><li><strong>异步渲染与切换视图</strong>：视图都是 <code>async</code>的，await 期间用户切走后，旧代码继续操作已被替换的 DOM 就会报<code>null</code>；让每个视图持有独立容器、旧容器隐藏保留片刻，问题从根上消失。</li></ol><hr><h2 id="九目录结构">九、目录结构</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">admin/</span><br><span class="line">├── server.js            # 本机模式后端服务（零依赖，单文件）</span><br><span class="line">├── config.json          # 本机凭据（自动生成，已 gitignore）</span><br><span class="line">├── test-api.js          # 回归测试（101 项）</span><br><span class="line">├── backups/  trash/     # 本机模式备份与回收站</span><br><span class="line">└── README.md            # 完整使用文档</span><br><span class="line"></span><br><span class="line">source/admin/            # 后台前端（随博客发布到 /admin/）</span><br><span class="line">├── index.html  app.js  style.css  fm.js</span><br><span class="line">└── storage.js           # 图床模块（OSS 直传签名 / 自定义接口 / 云相册）</span><br><span class="line"></span><br><span class="line">.github/workflows/</span><br><span class="line">└── auto-deploy.yml      # GitHub Actions 自动构建部署</span><br></pre></td></tr></table></figure><hr><h2 id="十安全说明">十、安全说明</h2><ul><li>本机模式默认仅监听 <code>127.0.0.1</code>；密码 scrypt加盐哈希；令牌 HMAC 签名</li><li>云端模式：令牌仅存浏览器本地；请使用细粒度令牌并只授权本仓库，定期更换</li><li>所有文件操作均做路径校验（防目录穿越）；删除仅入回收站 / Git历史可找回</li><li>修改配置文件自动备份（本机）或依赖 Git 历史（云端）</li></ul>]]></content>
+      
+      
+      <categories>
+          
+          <category> 网络技术 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web前端 </tag>
+            
+            <tag> 技术 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>存在与死亡</title>
+      <link href="/2026/08/22/%E5%AD%98%E5%9C%A8%E4%B8%8E%E6%AD%BB%E4%BA%A1/"/>
+      <url>/2026/08/22/%E5%AD%98%E5%9C%A8%E4%B8%8E%E6%AD%BB%E4%BA%A1/</url>
+      
+        <content type="html"><![CDATA[<p><strong>在资本主义社会中一切的一切都被物化，人的一切也被打上了商品的标签</strong>。在实体商品的高成本下，为了压缩成本而一步步演化出虚拟的商品，以低成本的方式，大规模的像蝗虫一样，席卷着我们的生活。售卖情绪价值的商品牢牢的把控着你的喜怒哀乐。将每个人拉入到虚拟的狂欢中，不断榨取着所剩无几可怜的生活资料。难道这些榨取情绪价值的东西完全都是坏的吗？俗话说，亲不亲阶级分，在这个无产阶级被奴役的时代，资产阶级的一切情绪商品必然是为资产阶级服务的，资本的逐利性必然导致资本会拼尽全力压缩成本，而想办法榨取更多的情绪价值，短剧的诞生便是如此。</p><p><strong>在人生的大部分时间被虚假的东西充斥时，便会感到存在的虚无，进而更进一步的逃离到虚假的世界中</strong>。人是社会的集合，一切的一切都要联系现实，因为我们不能脱离现实而独自存在。而虚拟的世界在一定程度上造成了最大规模的“活着的死亡”。当人们无法成就自己的生存价值，而为生活资料奔波时，一天的疲惫只能使他沉浸在另一个虚假的世界。或是沉溺在虚假的阶级跨越中，享受着人上人的快感；又或是成为无所不能的神，大杀四方。这种虚假的快感，实际上是资本主义的生动体现。在资本主义社会下，会不断向无产阶级灌输，属于资产阶级的价值观。这就导致整个社会的导向都会转向利益优先的泥潭，其目的都是集中更多的资源，完成对多数人的支配的身份转变。而在资产阶级社会中，这种转变只属于小部分人，因为财富的集中，使资产阶级产生了一定的阶级特权，想要保障自己的阶级特权，就要维持自己的地位。资产阶级想要维持自己的地位，就只能不断的集中更多的财富来维持自己的地位。而资产阶级再怎么铺张浪费，他的消费能力都是有限的，更多的财富集中在手里花不出去，就只能通过投资生产来集中更多的财富。我们要知道资源是有限的，小部分人集中了90% ，那么大部分人只能分配 10%的资源。随着集中的财富变多，就会造成富人越富、穷人越穷的现象。当穷人没有能力消费时，就会间接的影响富人，造成经济危机，当然，这就是后话了。</p><p><strong>我们必须承认，这种虚假的活着，其实就是现实中的死亡</strong>。大部分人努力工作都无法成为老板，这不是危言耸听，而是我们不能忽视的客观事实。虽然有一部分人能找到自己所热爱的事业，并且在工作实现了自己的自我价值，但是大部分人都无法呆在自己喜欢的岗位上，并且很多人也在重复着机械的工作。后两者被异化为了资本的机器，表面上活着，却丧失了『 人 』的属性。那么休息时间呢？资本主义的发展，使人们的情绪得到了售卖，通过资产阶级文化，向人们构造出几乎不可能实现的资本主义幻想，在此基础上，甚至打上价格，进行售卖。就像短视频以及网络小说一样，虽然说放松并没有什么错，但是为了售卖情绪，设计出来一系列成瘾机制，将无效时间充满了整个空闲时间。这些东西，被资本主义精心打包，造成了一定的休息时间的浪费。而这些毫无营养的时间浪费，便造成了另一个维度的死亡。</p><p><strong>存在感的削弱，使人们陷入到另一种层次的虚无主义</strong>。在工作中感觉不到自己的价值，空闲时间又被成瘾的东西侵蚀，无法去有效提升自己，就会进一步的削弱自己的存在感，从而进一步的陷入到虚无主义中去。这种虚无主义会使自己进一步的感觉不到自己存在的意义，于是有的人选择自杀，有的人继续投入到更深的虚无主义中去，有的人也许会处于某种原因，不甘堕落，于是发奋图强，去除干扰源，继续提升自己。前两种对存在都进行了一定程度上的削弱，只有后一种才是真正意义上的加强。因为肉体上的存在哪怕活到了100岁，当他的大部分时间处在一种存在感削弱的情况下时，我认为其实和50岁没有区别。在现实中，大部分人无法成为小说主角、短剧主角。时间是恒定的，而不是分成两份的，加剧不切实际的幻想，就会削弱现实中的存在。这也是目前社会大部分人不得不面对的现实。</p><p><strong>存在与死亡的对立</strong>。不得不承认，由于时间的单一性，所以存在与死亡处于对立的状态，两者并不能共存。值得注意的是，我在这里所谈论的存在与死亡都是连续的，而不是瞬时的；是精神的，而不是肉体的。或许古人常说的重于泰山、轻如鸿毛的死便是如此。死亡的重量不在于早晚，而取决于存在的重量。我们常说的自我价值的实现也取决于存在的重量。正如奥斯特洛夫斯基所说的那样：</p><blockquote><p>人最宝贵的是生命。生命对人来说只有一次。人的一生应当这样度过∶当回忆往事的时候，他不会因为虚度年华而悔恨，也不会因为碌碌无为而羞愧；在临死的时候，他能够说：“我的整个生命和全部精力，都已献给了世界上最壮丽的事业――为人类的解放而斗争。”</p></blockquote><p>不管结果怎么样，不管你对他的信念认可不认可，我们都要承认，他已经在他的生命中得到了满足。所以看到这的朋友们，你如何看待你的人生呢？</p><p>————END————</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 哲学 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 社会思考 </tag>
+            
+            <tag> 哲学 </tag>
+            
+            <tag> 杂谈 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>杀戮尖塔战士哥A10抓牌思路</title>
+      <link href="/2026/06/05/%E7%94%9F%E6%B4%BB%E6%9D%82%E8%B0%88/%E6%9D%80%E6%88%AE%E5%B0%96%E5%A1%94%E6%88%98%E5%A3%AB%E5%93%A5A10%E6%8A%93%E7%89%8C%E6%80%9D%E8%B7%AF/"/>
+      <url>/2026/06/05/%E7%94%9F%E6%B4%BB%E6%9D%82%E8%B0%88/%E6%9D%80%E6%88%AE%E5%B0%96%E5%A1%94%E6%88%98%E5%A3%AB%E5%93%A5A10%E6%8A%93%E7%89%8C%E6%80%9D%E8%B7%AF/</url>
+      
+        <content type="html"><![CDATA[<p>随着安东尼永除塔扉，引来了重量级的答辩—— <strong>沙漏</strong> 。</p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605095300163.png" alt="永世沙漏" style="zoom:50%;" /></p><p>在殴打它的时候，它不仅有极高的数值，还会狠狠的给你塞<strong>凋萎</strong> 。</p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605095549369.png" alt="凋零" style="zoom:50%;" /></p><p>所以战士哥作为 t0 中的 t0抓牌思路就显得尤为重要。我们将战士哥的卡牌具体分为以下几类：</p><p><strong>攻击端</strong> 、 <strong>防御端</strong> 、<strong>运转端</strong> 、 <strong>烧牌端</strong> 、<strong>加费端</strong></p><p>这里给出一个简单的梯度排行</p><p><imgsrc="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/3299819FC0C6CBE410486DFC41FF82A0.jpg" /></p><p>塔2状态牌的增加，使得战士的烧牌变得尤为宝贵，这也使我们必须要有一张烧牌卡。所以重振精神便被提到了sss 的地位。</p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605171007690.png" style="zoom:50%;" /></p><p>目前战士的主要流派为易伤流和防御流。</p><h2 id="易伤流">易伤流</h2><p>易伤流的核心牌 <strong>主宰</strong> 与 <strong>熔融之拳</strong></p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605114020199.png" style="zoom:50%;" /></p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605153603539.png" style="zoom:50%;" /></p><p>过牌主要依赖 <strong>凶恶</strong></p><p>!<img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605114052655.png" style="zoom:50%;" /></p><p>易伤流重点在于利用各种易伤牌挂易伤，然后由 <strong>主宰</strong>叠力量，再通过拆卸、飞剑回旋镖等打多段输出，在小怪人均高伤害的今天。主打一个你不打死我，我就打死你。</p><h2 id="防御流">防御流</h2><p>防御流比较依靠欧气，所以不建议平时硬玩，如果开局停了壁垒或坚定不移可以考虑玩。</p><p>防御流壁垒是核心牌，以下牌都是基于有了壁垒之后抓胡的。</p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605170046056.png" style="zoom:50%;" /></p><p>ps: <strong>这张牌没有壁垒不建议抓</strong> 。</p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605170227135.png" style="zoom:50%;" /></p><p>下面的牌没有壁垒也可以拿。</p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605170338299.png" style="zoom:50%;" /></p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605170422068.png" style="zoom:50%;" /></p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605170458275.png" style="zoom:50%;" /></p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605170527207.png" style="zoom:50%;" /></p><p>防御流的输出端就是我们常见的肚皮了。</p><p><img src="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260605170702116.png" style="zoom:50%;" /></p><p>—END—–</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 生活杂谈 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 生活杂谈 </tag>
+            
+            <tag> 游戏 </tag>
+            
+            <tag> 杀戮尖塔2 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>学习的阳痿，压缩的大脑</title>
+      <link href="/2026/05/27/%E5%93%B2%E5%AD%A6/%E5%AD%A6%E4%B9%A0%E7%9A%84%E9%98%B3%E7%97%BF%EF%BC%8C%E5%8E%8B%E7%BC%A9%E7%9A%84%E5%A4%A7%E8%84%91/"/>
+      <url>/2026/05/27/%E5%93%B2%E5%AD%A6/%E5%AD%A6%E4%B9%A0%E7%9A%84%E9%98%B3%E7%97%BF%EF%BC%8C%E5%8E%8B%E7%BC%A9%E7%9A%84%E5%A4%A7%E8%84%91/</url>
+      
+        <content type="html"><![CDATA[<p>看贴吧的时候看到了一个很有趣的现象。当发的文字太长的时候，便会有人说：<strong>太长不看</strong> 。</p><p>当然，不排除有些写的确实不好，有部分人不想看流水账之类的，但也是有相当一部分人，其实是真的看不下去长文字了，甚至连一本书都看不下去了。这种情况，我愿意称之为<strong>学习上的阳痿</strong> 。</p><p>嗯，话说的有点丑陋了。但是确实是这么一个道理嘛！你看，阳痿是<strong>再起不能</strong>，看不下去长文字与看不下去书，其实是书本和长文字的“<strong>再起不能</strong> ”。固然也可以叫<strong>学习上的无兴趣</strong>，但是这个名字不仅长，而且拗口，所以我们还是叫<strong>学习上的阳痿</strong> 好了。</p><p>那么为什么会产生 <strong>学习上的阳痿</strong>这种现象呢？为什么又要和 <strong>学习</strong> 扯上关系呢？首先要从<strong>情绪价值</strong> 说起。</p><h2 id="什么是情绪价值">什么是情绪价值？</h2><p>我们在这里借用一下这个心理学名词，首先，价值无非就是<strong>成本</strong> 和 <strong>收益</strong> 嘛。<strong>成本</strong>是一个物品被生产出来的损耗和可能面对的风险。加上情绪二字，就摇身一变，成为产生该情绪的所需的资源和风险了。那么<strong>情绪收益</strong>就好理解多了，是由情绪产品所获得的积极情绪体验。</p><p>那么情绪价值想必有些数学敏感度的同学可能就豁然开朗了，情绪价值( <span class="math inline"><em>z</em></span> )就是情绪成本( <span class="math inline"><em>y</em></span> )与情绪收益( <span class="math inline"><em>x</em></span>​ )之间的净差值：</p><p><span class="math display"><em>z</em> = |<em>x</em> − <em>y</em>|</span></p><p>当低情绪成本能获得更高的情绪收益时，便很难去忍受稍微高一点的情绪成本了。例如我们在以前的选择很少，所以解一道数学题、看一本书可能就能使我们的情绪价值得到满足，但是在经过短视频、网文的洗礼后，便很难再接受这些高情绪成本的事情。因为短视频、网文缩短了时间成本，这使得更多的人无法忍受自己要花费更多的时间，这使得很多人无法忍受从书本中获取情绪价值。也就是说，丧失了主动学习的能力，更多的时候，学习成为了一件被动、被推着走的事情，也导致了学习不仅可能不会带来正面情绪收益，还会带来负面情绪收益，形成恶性循环。</p><p>人们开始慢慢只能接受短的事物，或者是在短时间内获取更多的信息，就像一个个压缩包一样，大脑只能接受压缩包，而对背后的原理等等，开始忽略，这种<strong>压缩的大脑</strong>是网络时代情绪化与二极管化的源泉之一。因为很多人已经没有耐心去探究背后的真假，不论谣言与否，人们可能只愿意相信自己得到的第一手“ <strong>真相</strong> ”。再加上学习能力降低导致的知识面窄化，以及各个平台有意无意的信息茧房，每个人都被困在了孤岛上。终于，完成了人向人形机器的转变，只要继续供给这种低廉的情绪价值，那么便可以暂时的忽略掉自己的压迫与痛苦，我们便变成了颜料，被资本家肆意涂抹在他的商业蓝图上。所有的逃避都化作了不切实际的幻想，就这样，你的剩余时间也被抹去了，换句话说:<strong>你被提前杀死了</strong> 。</p><h2 id="学习上的阳痿">学习上的阳痿</h2><p>那么什么是学习上的阳痿呢？是由资本主义社会下，为了快速提供情绪价值而研发出来的一系列产品，这些产品导致无法使学习获得更高的情绪收益，从而压缩了大脑，看不下去长文字等，从而在主动学习上再起不能，甚至于杀死学习。</p><p>当然，也杀死了我们。</p><p>END</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 哲学 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 哲学 </tag>
+            
+            <tag> 马克思主义 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>写在前面的话</title>
+      <link href="/2026/05/24/%E5%86%99%E5%9C%A8%E5%89%8D%E9%9D%A2%E7%9A%84%E8%AF%9D/"/>
+      <url>/2026/05/24/%E5%86%99%E5%9C%A8%E5%89%8D%E9%9D%A2%E7%9A%84%E8%AF%9D/</url>
+      
+        <content type="html"><![CDATA[<h1 id="这里是flytotmoon的博客">这里是flytotmoon的博客</h1><h2 id="基于anzhiyu主题">基于anzhiyu主题</h2><figure><imgsrc="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20260524201225098.png"alt="博客页面预览" /><figcaption aria-hidden="true">博客页面预览</figcaption></figure><p>anzhiyu是一个基于butterfly主题的一个非常优秀的 <strong>主题</strong>。同时可自定义的地方也非常多。</p><p>此主题也基于 HEXO 。作为一个广为人知的静态框架，以安全、小巧<code>ps:主要是不用托管服务器，部署到github上就行了</code> 闻名。</p><div class='anzhiyu-tag-link'><a class="tag-Link" target="_blank" rel="noopener external nofollow noreferrer" href="https://docs.anheyu.com/">    <div class="tag-link-tips">引用站外地址</div>    <div class="tag-link-bottom">        <div class="tag-link-left" data-icon="https://docs.anheyu.com/favicon.ico">          <img class="tag-link-favicon" src="https://docs.anheyu.com/favicon.ico" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" style="" alt="favicon"/>          <i class="anzhiyufont anzhiyu-icon-link" style="display:none"></i>        </div>        <div class="tag-link-right">            <div class="tag-link-title">anzhiyu主题安装</div>            <div class="tag-link-sitename">anzhiyu主题</div>        </div>        <i class="anzhiyufont anzhiyu-icon-angle-right"></i>    </div>    </a></div><p>本人写博客的方式是利用 typora + hexohub 实现。</p><p>typora 是一个强大的 markdown 编辑器， hexohub是一个后台托管软件，日常用起来非常方便。</p><h2 id="修改的地方">修改的地方</h2><p>将 twikoo 评论的气泡样式进行了魔改。</p><p>详细教程可参考以下链接。</p><div class='anzhiyu-tag-link'><a class="tag-Link" target="_blank" rel="noopener external nofollow noreferrer" href="https://akilar.top/posts/d99b5f01/">    <div class="tag-link-tips">引用站外地址</div>    <div class="tag-link-bottom">        <div class="tag-link-left" data-icon="https://akilar.top/favicon.ico">          <img class="tag-link-favicon" src="https://akilar.top/favicon.ico" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" style="" alt="favicon"/>          <i class="anzhiyufont anzhiyu-icon-link" style="display:none"></i>        </div>        <div class="tag-link-right">            <div class="tag-link-title">twikoo评论块气泡风格魔改美化 | Akilarの糖果屋</div>            <div class="tag-link-sitename">twikoo气泡</div>        </div>        <i class="anzhiyufont anzhiyu-icon-angle-right"></i>    </div>    </a></div><h1 id="写在最后的话">写在最后的话</h1><p>总而言之，这是我 <strong>分享生活</strong>的地方。随着信息时代的日新月异，这种个人博客越来越少，大部分人都舍弃了个人博客，开始转向第三方软件，例如知乎、微博等。</p><p>第三方软件固然方便，可是也失去了很多自定义的乐趣，以及严厉的审核让很多东西发不出来。</p><p>所以我选择了利用 hexo 搭建一个个人博客。固然缺少了很多流量，<strong>可别有一番乐趣</strong> ，不是么？</p><p>再见！</p><p>写于 2026 年 5 月 24 日 20:34.</p><p>END———-</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 杂文 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 个人博客 </tag>
+            
+            <tag> 社会思考 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>《包法利夫人》读后感</title>
+      <link href="/2026/02/09/%E6%9D%82%E6%96%87/%E3%80%8A%E5%8C%85%E6%B3%95%E5%88%A9%E5%A4%AB%E4%BA%BA%E3%80%8B%E8%AF%BB%E5%90%8E%E6%84%9F/"/>
+      <url>/2026/02/09/%E6%9D%82%E6%96%87/%E3%80%8A%E5%8C%85%E6%B3%95%E5%88%A9%E5%A4%AB%E4%BA%BA%E3%80%8B%E8%AF%BB%E5%90%8E%E6%84%9F/</url>
+      
+        <content type="html"><![CDATA[<h1id="包法利夫人跌进美好幻想的悲剧">包法利夫人——跌进美好幻想的悲剧</h1><p>《 包法利夫人》是由法国作家福楼拜根据他父亲的学生德拉马尔为素材所创作出来的一个关于情妇出轨最后自杀的故事。德拉马尔是一个医生，他的妻子酷爱读小说，生活奢靡、放荡，最后被两个情夫抛弃，负债累累而自杀。这本小说虽然大概也是讲了这么一个故事，但是小说之所以是小说，就是因为会根据作者的想象添加了很多细节，所以我们不仅能看到包法利夫人的变化过程，也能体会到那一时期的法国外省风情，毕竟小说的副标题就叫做<strong>外省风情</strong> 嘛。</p><h2 id="故事梗概">故事梗概</h2><p>包法利夫人爱玛是一个生长在农家小院的小姐，从小在修道院长大，接受过贵族化的教育，读过许多浪漫主义的小说，心里充满着对奇幻爱情的渴望。小包法利查理出生在一个充满悲剧的家庭中，他的父亲风流成性却又自以为是，对学校嗤之以鼻，不允许查理上学，查理直到12岁才算是真正的上了学，结果没上几年就被父亲勒令退学考了医生。一个没有主见、没有才干雄心的人，和一个整天活在幻想里的人结合，会发生什么样的化学反应呢？当然是<strong>出轨</strong>。第一个出轨对象是道德败坏的乡绅，第二个出轨对象是自私怯弱的文书。因为幻想与现实的割裂，她无时不刻的厌恶着自己的丈夫和婚姻，因为活在幻想里，她不惜借高利贷来接近那个<strong>幻想</strong>中的自己。但是幻想是幻想，现实是现实，高利贷是要还的，当商人不再假装仁慈，露出獠牙，需要还的一笔笔帐就会如同大山一样朝她压过来。幻想没有了，现实却更加恐怖了，她的情人们抛弃了她，被压垮了，没救了！于是山穷水尽之下选择了自杀。</p><h2 id="悲剧的包法利夫人爱玛">悲剧的包法利夫人——爱玛</h2><p>福楼拜并没有简简单单的将爱玛写成一个坏女人，并没有人生来就是坏人。人是他所处社会环境的集合，可以说把爱玛推入深渊的，是整个环境和她自己共同“<strong>努力</strong>”的结果。首先是她天真的父母，将她送去修道院接受大家闺秀的教育，当一个阶级的人去接受一个与她的家庭经济基础所不匹配的教育，便会使一个乡村少女产生不切实际的幻想——<strong>向往贵族的风雅生活</strong>。她开始阅读浪漫主义的小说，幻想着与骑士来个美丽的邂逅：</p><blockquote><p>后来她读司各特，醉心历史事物，梦想着大皮柜、警卫室和行吟诗人。她巴不得自己也住在一所古老庄园，如同那些腰身细长的女庄主一样，整天在三叶形穹隆底下，胳膊肘支着石头，手托住下巴，遥望一位白羽骑士，胯下一匹黑马，从田野远处疾驰而来。</p></blockquote><p>幻想着自己是浪漫小说的女主角，或是天真烂漫的贵妇：</p><blockquote><p>她战战兢兢，吹开保护画幅的绢纸；绢纸掀起一半，又轻轻落下。上面画的是：阳台栏杆后面，一个穿短斗篷的青年男子，搂住一个腰带挂着布施袋的白袍少女；要不然就是英吉利贵妇的无名画像，金黄发环，戴圆草帽，睁开又大又亮的眼睛望你。有的贵妇仰靠在马车内，驰骋草地，马前有一只猎犬跳跃，两个白裤小僮驭马。有的贵妇坐在沙发上，身旁一封开口的信，仰首凝思，遥望月亮，窗户半开，还让黑幔挡住一半。天真烂漫的贵妇，脸上一滴泪珠，隔着哥特式鸟笼的小柱，逗着笼中的斑鸠；要不就是偏着头微笑，十指尖尖，翘起如波兰式鞋，掐着雏菊的花瓣。画上还有吸长烟袋的苏丹，在凉棚底下陶醉在印度舞姬的怀抱里；还有“邪教徒”、土耳其刀、希腊帽；特别是酒神故乡暗淡的风景，我们经常在这里看到棕榈、冷杉，右边几只老虎，左边一只狮子，天边几座鞑靼尖塔，近景是罗马遗迹，稍远是几只蹲在地上的骆驼；——一片洁净的原始森林，像框子一样，环绕四周，同时一大道阳光，笔直下来，在水中荡漾，或远或近，青灰的湖面露出一些白痕，表示有几只天鹅在游动。</p></blockquote><p>她的父亲也怜惜她，从来没有让她干过活，她与她所生活的圈子格格不入，整体无所事事，日子十分的单调，于是她期待着<strong>爱情</strong> 。</p><p>就在这时，小包法利——查理出现了。查理是一个医生，在乡下人眼里，因为治好了卢欧老爹的腿，所以查理不仅仅是一个有学问的人，还有着一个体面的工作，于是一来二去爱玛就成为了包法利太太（并非包办婚姻，因为爱玛也同意了）。成为包法利夫人后，爱玛依然沉溺在甜蜜的爱情幻想里，可现实却给了她第一次打击，她以为的幸福并没有看见：</p><blockquote><p>但是对新生活的热望，或者也许是由于这个男人的存在而产生的刺激，足以使她相信：她终于得到了那种不可思议的爱情。在这以前，爱情仿佛一只玫瑰色羽毛的巨鸟，可望而不可即，在诗的灿烂天空翱翔；——可是现在她也不能想象，这种安静生活就是她早先梦想的幸福。</p></blockquote><blockquote><p>结婚以前，她以为自己有爱情；可是应当从这种爱情得到的幸福不见来，她想，一定是自己弄错了。<strong>欢愉</strong> 、 <strong>热情</strong> 和 <strong>迷恋</strong>这些字眼，从前在书上读到，她觉得那样美，那么在生活中，到底该怎样正确理解呢，爱玛极想知道。</p></blockquote><p>查理也与她幻想中的无所不能的骑士相差甚远：</p><blockquote><p>不过假使查理愿意的话，诧异的话，看穿她的心思的话，哪怕一次也罢，她觉得，她的心头就会立时涌出滔滔不绝的话来，好比手一碰墙边果树，熟了的果子纷纷下坠一样。可是他们生活上越相近，她精神上离他却越远了。</p><p>查理的谈吐就像人行道一样平板，见解庸俗，如同来往行人一般，衣着寻常，激不起情绪，也激不起笑或者梦想。他说，他在鲁昂居住的时候，从未动过上剧场看看巴黎演员的念头。他不会游泳，不会比剑，不会放手枪，有一天，她拿传奇小说里遇到的一个骑马术语问他，他瞠目不知所对。</p><p>正相反，一个男子难道不该无所不知，无所不能，启发你领会热情的力量、生命的奥妙和一切秘密吗？可是这位先生，一无所教，一无所知，一无所期。他相信她快乐；然而她恨的正是他这种稳如磐石的安定，这种心平气和的迟钝，甚至她带给他的幸福。</p></blockquote><p>生活的平淡使爱玛更加沉溺于幻想之中，在查理的一位病人邀请他们去参加了一次贵族的舞会后，幻想变得更严重了，不断回忆着舞会的细节，沉溺在奢靡的幻想里：</p><blockquote><p>于是对舞会的回忆，成了爱玛的重要生活内容。每逢星期三，她醒过来，就问自己道：“啊！一星期以前……两星期以前……三星期以前，我在那边！”然而在她的记忆之中，面貌渐渐混淆；她忘却了四组舞的曲调；她不再能真切地想起仆从的号衣和房间；若干细节淡忘了，可是心头留下了怅惘。</p></blockquote><blockquote><p>她买了一张巴黎地图，用手指指点点，游览纸上的京城。她走到大街，逗留在每个角落，在街与街之间表示房屋的白方块前面。最后，她看累了，闭住眼睛，又见煤气灯在暗处随风摇曳，在剧院的柱廊前，一辆辆敞篷四轮马车，哗啦一声把踏板放下。</p></blockquote><p>但沉溺在幻想里的，更是活在现实里，于是生病了、厌倦了平淡的生活。即使搬家，新鲜劲一过，又会厌倦逃避生活，这使她越来越不在乎身边的人，发疯似的想让幻想照进现实，便选择了出轨，并为出轨而窃喜，认为终于实现了自己的幻想：</p><blockquote><p>她三番两次自言自语道：“我有一个情人！一个情人！”她一想到这上头，就心花怒放，好像刹那间又返老还童了一样。她想不到的那种神仙欢愉、那种风月乐趣，终于就要到手。她走进一个只有热情、销魂、酩酊的神奇世界，周围是一望无涯的碧空，感情的极峰在心头闪闪发光，而日常生活只在遥远、低洼、阴暗的山隙出现。</p><p>她于是想起她读过的书中的女主人公，这些淫妇多感善歌，开始成群结队，在她的记忆之中咏唱，意气相投，使她陶醉，就像自己变成这些幻象的真正一部分一样，实现了少女时期的长梦，从前神往的多情女典型，如今她也成为其中的一个。再说，爱玛还感觉到报复的满足。难道她没有受够折磨！可是现在，她胜利了。久经压制的感情，一涌而出，欢跃沸腾。她领略到了爱情，不后悔，不担忧，不心乱。</p></blockquote><p>当然就像莫文蔚在阴天中唱的那样：『激情褪去过后，总会带有一点点厌倦。』当与幻想有一点点割裂，便会厌恶，又沉溺在更严重的幻想里：</p><blockquote><p>他们太相熟了，颠鸾倒凤，并不又惊又喜，欢好百倍。她腻味他正如他厌倦她。爱玛又在通奸中发现婚姻的平淡无奇了。</p><p>可是怎么才能把他甩掉？这种幸福她虽然觉得鄙不足道，不过习惯成自然，或者积恶成癖，她不惟安之若素，而且一天比一天迷恋，也正因为竭泽而渔，幸福反倒成为无水之池了。希望落空，她怪罪赖昂，好像他欺骗了她一样；她甚至于希望祸起萧墙，造成他们的分离，因为她没有勇气做出分离的决定。</p><p>她并不因而就中止给他写情书，因为她认为一个女人应当永远给她的情人写信。</p><p>但是她在写信中间，见到的恍惚是另一个男子、一个她最热烈的回忆、最美好的读物和最殷切的愿望所形成的幻影。他最后变得十分真实、靠近，但是她自己目夺神移，描写不出他的确切形象：他仿佛一尊天神，众相纷纷，隐去真身。他住在天色淡蓝的国度，月明花香，丝梯悬在阳台上，摆来摆去。她觉得他近在咫尺，凌空下来，一个热吻就会把她活活带走，紧跟着她又跌到地面，心身交瘁；因为这些爱情的遐想，比起淫欲无度，还要使她疲倦。</p></blockquote><p>不过为了自己的幻想，不断的借高利贷来满足自己，最后不仅仅拖垮了自己也拖垮整个家，就是后话了。</p><h2 id="写在最后的话">写在最后的话</h2><p>包法利夫人的悲剧是浪漫主义与现实的冲突造成的。福楼拜说过：“就在此刻，我可怜的包法利夫人，正同时在法兰西二十个村落里受苦、哭泣。”包法利夫人是个令人讨厌、不齿的女人，但滑稽的是，她却比任何一个人向往崇高。『向往』与『现实』的冲突使她在现实里备受摧残，难怪福楼拜对朋友说：“爱玛就是我！”脱离现实的幻想是多么的害人呀！竟然让一个人走向了死亡。</p><p>最后写一段十分主观的话：我不会同情爱玛，因为她总想象美丽、总想象崇高，自己的行为却背离了幻想；总是抱怨身边的环境，自己却一头扎进了污泥中；总是幻想着高尚的骑士和自己邂逅，自己却先做了荡妇。我只会可怜查理和他们的小女儿，被爱玛拖累拖垮，最后搞得家破人亡。至于爱玛，哼哼！<strong>我鄙视你</strong> ！</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 杂文 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 社会思考 </tag>
+            
+            <tag> 杂谈 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>评一些网络博主对《钢铁是怎样炼成的》的污蔑</title>
+      <link href="/2026/02/09/%E6%9D%82%E6%96%87/%E8%AF%84%E4%B8%80%E4%BA%9B%E7%BD%91%E7%BB%9C%E5%8D%9A%E4%B8%BB%E5%AF%B9%E3%80%8A%E9%92%A2%E9%93%81%E6%98%AF%E6%80%8E%E6%A0%B7%E7%82%BC%E6%88%90%E7%9A%84%E3%80%8B%E7%9A%84%E6%B1%A1%E8%94%91/"/>
+      <url>/2026/02/09/%E6%9D%82%E6%96%87/%E8%AF%84%E4%B8%80%E4%BA%9B%E7%BD%91%E7%BB%9C%E5%8D%9A%E4%B8%BB%E5%AF%B9%E3%80%8A%E9%92%A2%E9%93%81%E6%98%AF%E6%80%8E%E6%A0%B7%E7%82%BC%E6%88%90%E7%9A%84%E3%80%8B%E7%9A%84%E6%B1%A1%E8%94%91/</url>
+      
+        <content type="html"><![CDATA[<h1id="评一些网络博主对钢铁是怎样炼成的的污蔑">评一些网络博主对《钢铁是怎样炼成的》的污蔑</h1><p>『Schopenhauer说过这样的话：要估定人的伟大，则精神上的大和体格上的大，那法则完全相反。后者距离愈远即愈小，前者却见得愈大。正因为近则愈小，而且愈看见缺点和创伤，所以他就和我们一样，不是神道，不是妖怪，不是异兽。他仍然是人，不过如此。但也惟其如此，所以他是伟大的人。战士战死了的时候，苍蝇们所首先发见的是他的缺点和伤痕，嘬着，营营地叫着，以为得意，以为比死了的战士更英雄。但是战士已经战死了，不再来挥去他们。于是乎苍蝇们即更其营营地叫，自以为倒是不朽的声音，因为它们的完全，远在战士之上。的确的，谁也没有发见过苍蝇们的缺点和创伤。然而，有缺点的战士终竟是战士，完美的苍蝇也终竟不过是苍蝇。去罢，苍蝇们！虽然生着翅子，还能营营，总不会超过战士的。你们这些虫豸们！』</p><p>以上为鲁迅先生的《战士和苍蝇》，在此引用这篇杂文是因为网络实在是太包容了，使某些苍蝇竟然也能得意起来，乱说一气！这嗡嗡叫声太过于聒噪，令人心烦！令人愤怒！在这里我就不点名，给苍蝇筑巢了。先来谈谈什么叫做一本好的小说。</p><p>我我认为一本好的小说首先在于是否拥有一个好的故事，《钢铁是怎样炼成的》是完全符合的，即使它的文笔被人诟病，也不失为一本好小说！一些中年老登，因为自己老了，没有热血也没有动力学习了，便害怕新一代的年轻人超过他们，威胁他们吉吉国王的地位，于是害怕了，在拉屎的时候冥思苦想，突然扇了自己一巴掌，大叫到“TMD，我到现在还是这个逼样，原来都是因为我年轻的时候看了《钢铁是怎样炼成的》！都是奥斯特洛夫斯基害的！”然后裤子没提，就赶紧坐到椅子上，发这么一段视频（再不发就老年痴呆忘咯）大放厥词的谈论什么文学性、什么二流文学等等，最后又说什么人性呀、社会黑暗呀之类的，发表了一些老登味十足的发言。评论区的一些小苍蝇也按耐不住了，开始疯狂口吐白沫：『啊对对对！《卡拉马佐夫兄弟》、《战争与和平》！』，你们都看过《卡拉马佐夫兄弟》吗？怕不是翻了个目录，什么短视频带你5分钟看完一本书，就开始『人性黑暗，伟大！文学性无需多言！』起来了。</p><p>什么是人性？人性是社会赋予你的，人是社会关系的总和。所谓自私是人性，是私有制社会的产物，换句话说，是统治阶级为了维持不平等的剥削以及压迫，所制造出的一种合法性概念。只有这样，才能将一个阶级对另一个阶级的压迫掩饰为个人原因，在受到压迫的时候，想到的不是反抗，而是感叹一句“唉！这就是人性！”</p><p>呵呵！这些人将世界的不平等全部归结于人性身上，是何等的荒谬！就像说保尔·柯察金是反人性的一样。难道对高尚的人大肆批判，这个世界所有高尚的人就会消失吗？正是因为有这么“反人性”的一群人，去反抗这个私有制社会的人性，与私有制社会所赋予的人性作斗争，才会涌现出这么一群无私、伟大的人，不断地与世界的不平等作斗争，才有了现在普通人所拥有的地位。除非你想回到5、6岁的小孩掏烟囱，工人平均寿命25岁的伟大的工业革命维多利亚时期，否则你就不能否认这群高尚的人对于这个世界的贡献！</p><p>年轻人正处于身体发育的巅峰时期，是这一生最适合进步思考的时期。可是总有一些老登，面对年轻人的热血、年轻人的愤怒，泼凉水，说着什么你还年轻以后就懂了、你不懂人性等等，我想这些“老资历”怕是怎么也想不明白：</p><p>『为什么年轻人一代代的不如这群老登，世界却是越来越进步的，而不是倒退回原始社会呢？』</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 杂文 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 社会思考 </tag>
+            
+            <tag> 杂谈 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>纪念列宁逝世102周年</title>
+      <link href="/2026/02/09/%E6%9D%82%E6%96%87/%E7%BA%AA%E5%BF%B5%E5%88%97%E5%AE%81%E9%80%9D%E4%B8%96102%E5%91%A8%E5%B9%B4/"/>
+      <url>/2026/02/09/%E6%9D%82%E6%96%87/%E7%BA%AA%E5%BF%B5%E5%88%97%E5%AE%81%E9%80%9D%E4%B8%96102%E5%91%A8%E5%B9%B4/</url>
+      
+        <content type="html"><![CDATA[<p>转眼间，就到了列宁逝世的102周年，距离上次24年1月21日的100周年已经过了两年，虽然1月21日已经过去了（笑），但还是来写写这个迟来的纪念吧！</p><p>我记得在24年3月之前，都没有真正的认识过列宁，或者说只有一个简陋的框架，只知道他是苏联的第一代领导人、他是马克思主义的代表人物、出色的领袖，除此之外就一无所知了，毕竟我当时也只是个混日子的普通大学生。可是脱产的年轻人总是有大把的时间，活力的种子在他们的心中生根发芽，越冲动、越不安分就会使种子破出泥土的愿望越强烈。幼稚、躁动不安让它越来越不能忍受，然后是愤怒，愤怒的力量让它终于是不管不顾，冲了出来！到底是年轻人真是年轻气盛还是年轻气盛才是年轻人？我不知道。但这股年轻气盛的气势和越来越不满的愤怒终于让我重新认识到了列宁。我仍然清楚的记得在一个下午点开的那个视频：</p><p>列宁被群众围住，做着慷慨激昂的演讲“<strong>同志们！要维持一个政权，比夺取它还要难！我们的革命，正在前进！正在发展和成长！可是我们的斗争也是正在发展着！和成长着！我接到一张纸条子，你们大家听我来念一念『你们的政权反正是不能维持的，你们的皮将要剥下来做鼓面！』，我看出这些字不是工人的手所写的，恐怕写这张纸条子的人，我看他也未必有胆量站在这！对的，同志们，我猜他是不敢出来试一试的。同志们！，当革命还正在进行的时候，就是说，当整个阶级在灭亡，它和一个人的死亡是根本完全不相同的，人死亡后尸首可以抬出去，但是旧社会在灭亡了的时候，很可惜，资产阶级的这个尸首，那就不可能把它一下子钉在棺材里，埋葬在坟墓里。资产阶级的尸首在我们的心里腐烂着，它把毒气传染给我们大家，它在发散着臭气！被人民意志所判决的叛徒们，一定要无情的消灭他们，我们让资产阶级们去发疯吧，让那些无价值的灵魂去哭泣吧！工人同志们，我们的回答就是这样的。加上三倍的警惕和小心，还要忍耐，大家应当守住自己的岗位。同志们，你们必须要记住，我们只有一条出路，那就是胜利，还有另外一条路——死亡。死亡不属于工人阶级</strong>！”</p><p>直到现在，我看到这个视频都会热血沸腾！自那以后，我凭着一腔的热血与愤怒，读着列宁的《怎么办》、《帝国主义是资本主义的最高形态》，我还看了《列宁传》了解列宁的生平，并认识了灌输论、先锋队理论等等。只有看了列宁的书才会燃起一股希望，重新找回失去的勇气。事物总是在不断的向上发展、生长着，实践也是先于理论决定着理论。『也许我会在以后丧失掉重新拾起的勇气，并在面对年轻人的激情，年轻人的热血以及不断的学习时感到羞愧，并在一阵虚无之后为自己的不进步、不学习开始狡辩：我早点认清现实会不会过的更好？他妈的，都是列宁害的！然后，开始像个暮气沉沉的老登一样，大喊一声：都听我的！你们这群小登！要早点认清现实啊！』但是现在我还是个年轻人，我依然处于热血中！我就是要幼稚的一往无前！哪怕后退也要相信一定会前进，这就是年轻人的热血与勇气！</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 哲学 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 哲学 </tag>
+            
+            <tag> 马克思主义 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>blog更换域名后，CNAME总是删除问题</title>
+      <link href="/2026/01/06/%E7%BD%91%E7%BB%9C%E6%8A%80%E6%9C%AF/blog%E6%9B%B4%E6%8D%A2%E5%9F%9F%E5%90%8D%E5%90%8E%EF%BC%8CCNAME%E6%80%BB%E6%98%AF%E5%88%A0%E9%99%A4%E9%97%AE%E9%A2%98/"/>
+      <url>/2026/01/06/%E7%BD%91%E7%BB%9C%E6%8A%80%E6%9C%AF/blog%E6%9B%B4%E6%8D%A2%E5%9F%9F%E5%90%8D%E5%90%8E%EF%BC%8CCNAME%E6%80%BB%E6%98%AF%E5%88%A0%E9%99%A4%E9%97%AE%E9%A2%98/</url>
+      
+        <content type="html"><![CDATA[<h1id="blog更换域名后cname总是删除问题">blog更换域名后，CNAME总是删除问题</h1><p>本人在给博客更换域名后发现一个算是很麻烦但又很简单的问题。在每次执行<code>hexo d</code> 上传到 <code>git.</code> 时，CNAME文件总是会被覆盖掉。导致自己的博客总是 404 ，只能重新再新建一个 CNAME文件。</p><p>笔者深知这样下去不是长久之计，于是灵机一动之后动了一下。如果在<code>source</code> 里面创建一个 CNAME文件，不就能每次上传的时候一起上传了吗？</p><p>于是说干就干！不说废话了！有两个实现路径：</p><h2 id="直接在source文件夹下创建">1.直接在source文件夹下创建</h2><p>在你的博客文件夹 <code>blog/source</code> 下直接创建一个<code>CNAME</code> 文件。（ 当然，里面要写上你的域名，应该不需要我提醒Q）</p><figure><imgsrc="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/54f74fa87d826aa9c522bba8d4948054.png"alt="示例图片" /><figcaption aria-hidden="true">示例图片</figcaption></figure><h2 id="通过-cmd-控制台创建文件">2.通过 cmd 控制台创建文件</h2><p>首先进入你的项目根目录的 <code>source</code> 目录下。</p><figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> source</span><br></pre></td></tr></table></figure><p>接着创建并写入 CNAME 文件。( example 为示例，里面填上你的域名 )</p><figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">echo</span> exmaple.com &gt; CNAME</span><br></pre></td></tr></table></figure><p>这样我们就成功在 <code>source</code> 文件夹下创建了一个 CNAME文件！！！！</p><h2 id="最后的最后">最后的最后</h2><p>现在我们再次执行上传三部曲：</p><figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">hexo clean</span><br><span class="line">hexo generate</span><br><span class="line">hexo d</span><br></pre></td></tr></table></figure><p>是不是可以神奇的发现不用再去 GitHub 仓库下创建一个 CNAME文件了呢？</p><p>以上就是解决该问题的全部步骤了！！！！！</p><p><a href="https://blog.flytotmoon.cn"><imgsrc="https://readme-typing-svg.demolab.com?font=Fira+Code&amp;pause=1000&amp;center=true&amp;vCenter=true&amp;width=435&amp;lines=你学会了吗？（点击返回主页）"alt="Typing SVG" /></a></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 网络技术 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 个人博客 </tag>
+            
+            <tag> web前端 </tag>
+            
+            <tag> 技术 </tag>
+            
+            <tag> cmd </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>什么是哲学？</title>
+      <link href="/2026/01/05/%E5%93%B2%E5%AD%A6/%E4%BB%80%E4%B9%88%E6%98%AF%E5%93%B2%E5%AD%A6%EF%BC%9F/"/>
+      <url>/2026/01/05/%E5%93%B2%E5%AD%A6/%E4%BB%80%E4%B9%88%E6%98%AF%E5%93%B2%E5%AD%A6%EF%BC%9F/</url>
+      
+        <content type="html"><![CDATA[<h1 id="什么是哲学">什么是哲学？</h1><p>什么是哲学？有这么一个观点，叫 <strong>人人都是哲学家</strong>，这是意大利革命家葛兰西提出的。这个观点看似很精妙，包含着一种<strong>合理的必然性</strong>在里面。他认为人民大众在日常处事以及日常对话中包含着<strong>哲学</strong> 也就是所谓的 <strong>以哲学处事</strong>。可实际上这和我们口中哲学是一回事吗？又或者说这种<strong>常识的哲学</strong> 可以和 <strong>强调意义上的哲学</strong>混为一谈吗？</p><p>答案当然是不能的，我们应该清楚的认识到不应该把人民大众表达方式中所涉及的常识的哲学和由哲学家们制定的强调意义上的哲学混为一谈。因为所谓常识的哲学是带有<strong>顺从</strong> 意味的， <strong>以哲学处事</strong>这句话（可以说是大众的哲学或常识的哲学）又或者说是<strong>人民大众的表达方式</strong> 其实暗含着对不可避免之事的<strong>顺从</strong>，又或者说这种日常哲学只是哲学的一部分，而不是完整的哲学。听着有种宿命论的意味对吧，想想我们日常生活中父母会常常对我们说：“努力工作。”或者是“找个安稳的工作。”还有一种情况是总有人挂在嘴边说的：“我要努力工作！”可是我们为什么要努力工作呢？也许有的人就要说了：“要赚钱呀！不赚钱怎么活！”这里我们就可以发现我们所谓的常识哲学，实际上是对统治阶级的顺从。这也揭示了大部分常识哲学实际原理为：在统治阶级的规则下行事。那常识的哲学就一无是处了吗？笔者并非贬低常识的哲学，常识的哲学还是有很多闪光点的，只是有一些碎片化而已。就像我们常常感叹：物是人非！还有像我们经典的诗词：<strong>今人不见古时月，今月曾经照古人。</strong>这些日常的话语里面实际上是暗含着对世界规则的积极思考的。不过，强调意义上的哲学不同于常识的哲学的地方在于，有的人以此为基础发现了世界的规律，并为了改造世界做着努力；有的人却只是感叹一下，可以想到物是人非，却想不到世界上的一切都是不断发生变化、不停运动的，想不到一切东西的未来都是不确定的，用老观念认识现在的事物，不愿意接受新事物，最后只能产生代沟，感觉到自己被时代抛弃（当然，事实也是如此）。总结一下：所谓常识的哲学有两点性质，一是顺从性，二是零碎性。我们可以认为常识的哲学是强调意义上的哲学的基础，但绝对不能混为一谈，因为常识的哲学是不系统、不明确的，并不能成为完整的哲学思想。</p><p><strong>其实大部分哲学都是顺从的哲学</strong>（当然这里说的是强调意义上的哲学，后面我都将用“哲学”来代表这个冗长的名词），<strong>因为哲学是具有阶级性的</strong>。大部分哲学都是认识、解释世界的哲学，无法脱离时代背景，于是不可避免的会产生许多与统治阶级相适应的思想。例如希腊的柏拉图，在他的哲学作品《理想国》中，便将人化为了三等，有的人生来就要劳作，有的人生来就要发号施令，设想在人与人之间建立一种与其贵族信仰相适应的阶级关系，尽管在他的笔下很美好，却无意间将人化为了三六九等。这也是为什么会有些学者批评柏拉图的理想国是“极权主义”，因为在追求自由平等的今天是无法忍受《理想国》这种情况的出现的。当然，我们也不必太苛责柏拉图，因为<strong>哲学思想是有其历史局限性的</strong>。所以并不能有任何一种哲学思想可以保证未来依然是我的天下。例如王阳明无法跳出当时儒学封建大背景，只能说他离经叛道，在唯心主义迈出了一步，但绝不能说他跳出了儒学封建、脱离了当时的社会背景。</p><p>虽然哲学无法突破其历史局限性，但<strong>与世界发展相适应的部分会保留下来，与世界发展不匹配、落后的部分会被舍弃</strong>。所以如果我们梳理历史，便会清晰的发现<strong>哲学是有一定继承性的</strong>。例如马克思主义中的唯物辩证法就脱胎于黑格尔的思想，但是去其糟粕，取其精华，吸收了其辩证法精华的部分，去掉了其唯心的部分，在此基础进行了创新。当然其实不只有黑格尔的影子，但是举这个例子的确是可以说明哲学是有继承性的。</p><p><strong>哲学分为改造世界的哲学和认识世界的哲学</strong>。在马克思之前只有认识世界的哲学，所谓认识世界就一定带有一些<strong>顺从性</strong>的，为什么我们要说认识世界是有一定顺从性呢？因为你所处的环境一定会对你产生一些的影响（你的习惯、你的认识······）你要认识世界，解释世界，解释社会，就不可避免的对统治阶级产生顺从的思想，或者是直接逃离到唯心的不可知论上去。在马克思之后就有了改造世界的哲学，改造世界是为了顺应世界发展的规律，探寻世界的发展规律，并将落后的部分淘汰掉，所以带有一定的<strong>预见性</strong>，这种预见性使得此类哲学更注重一些世界的基本规律，而不是创造某种东西（例如康德的“物自体”），将所有的事物包含进去。改造世界的志向使他们偏向唯物主义，着眼未来的发展使他们回望历史、渴望从历史中寻找答案。这便是改造世界的哲学。</p><p>有的人说：正确的哲学思想，是要能正确地反映整个世界发展的总规律，研究哲学必须时时刻刻抱着解决实际问题和指导行动的目的。也有人说：研究哲学是为了寻找个人的意义，寻求一个情感的宣泄口。当然，不论这两个人谁对谁错，我们都可以想到，也许你对自己的人生产生了迷茫；也许你在工作的时候事事不顺利······但是我们不必内耗自己、怀疑自己，因为说不定以前的哲学家已经给出我们答案了，只要求我们耐下性子，去看、去想、去思考。</p><p>总是会找到一个适合自己的答案的。</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 哲学 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 哲学 </tag>
+            
+            <tag> 马克思主义 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>纪念毛主席诞辰132周年</title>
+      <link href="/2026/01/05/%E6%9D%82%E6%96%87/%E7%BA%AA%E5%BF%B5%E6%AF%9B%E4%B8%BB%E5%B8%AD%E8%AF%9E%E8%BE%B0132%E5%91%A8%E5%B9%B4/"/>
+      <url>/2026/01/05/%E6%9D%82%E6%96%87/%E7%BA%AA%E5%BF%B5%E6%AF%9B%E4%B8%BB%E5%B8%AD%E8%AF%9E%E8%BE%B0132%E5%91%A8%E5%B9%B4/</url>
+      
+        <content type="html"><![CDATA[<h1 id="纪念毛主席诞辰132周年">纪念毛主席诞辰132周年</h1><p>转眼间就来到了132周年，距离我接触毛泽东思想来说，也有满打满算两年了。在上一年我还是一个愤怒的青年，当然今年依然保持愤怒，不过多了一丝窘迫和凄凉。想想自己的大学生活，感觉那时候真是一个叛逆青年，对马原毛概课嗤之以鼻，不喜欢课本，自己却去读了原著——《毛泽东选集》。谁能想到一本小小的书魔力竟然这么大，真的能改变一个人。</p><p>有人说：时间久了人总是会变的。在以前我是讨厌这个观点的，现在想想我还是有点太浅薄了，我把人看小了，我把世界也看小了，我以前错误的机械唯物主义观点应该得到纠正。<strong>世界上的一切都是运动的</strong> 。那么世界上怎么可能只有<strong>位置</strong> 和 <strong>数量</strong>的变动呢？拿我们应用物理系所学的一门课量子力学来说，粒子不就是无时无刻的运动的吗？薛定谔方程也是粒子的位置概率信息，而不是粒子的具体位置。近一点，就拿我们身边的凳子来说，它不仅随着地球的自转运动，也随着太阳的公转运动，放大到时间尺度上，也会随着时间腐朽、衰老、发生变化。那么人呢？人也是会变的，『引刀成一快，不负少年头』的热血青年汪精卫不也变成了臭名昭著的大汉奸了吗？人是会变的，所有东西都会变的，我也会变。突然有一天，我再也不是以前那个抽象乐子人了，可能是量变引起的质变？反正我多了许多别的心思。不过这别的心思到底是好还是坏呢？还没安置好自己却开始关心别人，一想起“世界既大，人就一定特别多。这样多的人怎样过生活，难道不值得我们注意吗？”就心生愤怒，总想着要做些什么。可愤怒还没消散，就会有压抑萦绕在心头，这是自己力量太小的警惕，也是自己身为一个脱产学生的迷茫。于是我迫切的想要尽早进入社会，想要完成无产阶级身份的转变，我前往图书馆，不再是准备考研，而是看着马列毛相关的书籍和资料，我也从来没有如此大的热情来关注新闻，这样的关注别人的事情。可是看着那些不好的新闻，只是会让人更加压抑，终于有一天我忍受不下去了，我不想再关注任何事情了——我当了一段时间的逃兵。此时正值131周年，我不仅考研没有好好准备，自己的生活也一地鸡毛，突然感觉自己挺失败的，什么也没做成。我开始摆烂，不想去想太多的事情，我和我的舍友去哈尔滨、青岛，和我的朋友去远足、爬泰山。结果今年上半年也过的浑浑噩噩的，连工作也没找到。毕业后，也被家里人揪了回来，报了考公的补习班，每天一个人呆在租的小房间里，一个人望着灯泡。</p><p>但是一个人在无聊的时候，总要找点事情干。不知道从哪一天起，我又拾起了那些我没看完的书。当然，不同的是，这次我是在空闲的时候。慢慢的消磨时光、慢慢的看书，我偷着空闲的时间看完了《雾都孤儿》、《旧制度与大革命》、《帝国主义是资本主义的最高形态》。不知道为什么，我反倒感觉到没有以前那么压抑了，虽然还有一点点。是因为我思考的时间变多了吗？我不知道。</p><p>日复一日使时间逃的飞快，转眼间到了132周年，马上又是2026年，一个新的起点。毛主席说过：道路是曲折的，前途是光明的。人总是要看到希望的，毕竟我也想在冬天的北海公园看到怒放的梅花嘛。</p><p>最后，虽然未曾谋面，但还是感谢您教了我很多东西！祝教员生日快乐！</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 哲学 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 哲学 </tag>
+            
+            <tag> 马克思主义 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>社会与自我价值</title>
+      <link href="/2025/12/06/%E5%93%B2%E5%AD%A6/%E7%A4%BE%E4%BC%9A%E4%B8%8E%E8%87%AA%E6%88%91%E4%BB%B7%E5%80%BC/"/>
+      <url>/2025/12/06/%E5%93%B2%E5%AD%A6/%E7%A4%BE%E4%BC%9A%E4%B8%8E%E8%87%AA%E6%88%91%E4%BB%B7%E5%80%BC/</url>
+      
+        <content type="html"><![CDATA[<h1 id="社会与自我价值">社会与自我价值</h1><p>笔者在晚上睡觉时，突然想到了颇有争论的议题——『 自我价值』，什么是自我价值？一直都在提这个东西，却从未深入思考过，如果有人突然问你这样一个问题，你能立即回答出来吗？想来是不容易的。就像面试时面试官问你对岗位的了解，你侃侃而谈，结果面试官却冷不丁说了一句——××是什么意思？××就是······突然，你发现你对这个概念只有一个模糊的感觉，并不能说出个一二三。当然，笔者讨论这个概念并不是咬文嚼字，像面试官一样故意刁难，本人也只是思考一下，用自己的方式来理解探究，即使观点不同也希望大家一起讨论，迸发出不一样的火花。</p><p><strong>什么是自我价值</strong>？马克思主义认为，人的价值，就是指人对自己、他人乃至社会需要的满足；人的价值包含两个方面，其一是社会价值，其二是人的自我价值。具体地说，就是人通过自身的实践活动，充分发挥其体力和智力的潜能，不断创造出物质财富和精神财富，在满足自身需要的同时，满足他人和社会的需要。</p><p>我们可以看到，自我价值不仅仅有自我，还有 <strong>社会</strong>。这也就导致我们<strong>在追求价值的实现的时候其实是深受社会影响的</strong>。大部分人或者说整体的价值取向，都取决于我们的上层建筑。这不仅仅上层建筑对下面不断的进行相关的意识形态教育，也是因为在统治阶级所制定的规则下，下面的民众只有反抗与顺从两种选择。又因为前者的影响，所以大部分人只会选择顺应统治阶级的规则。这时自我价值就会分裂成两种：<strong>反抗的自我价值</strong> 与 <strong>顺应的自我价值</strong>。</p><p><strong>顺应的自我价值</strong> 在于统治阶级（这里不仅仅指狭义上的国家统治阶级，也指在社会具有表面上的压倒性力量，占统治地位的阶级，他们通常占领着社会舆论高地）无时不刻的思想灌输。例如通过电视剧、电影、短视频平台等舆论阵地宣传有钱人的爱恨情仇、宣传一些高管小资的爱恨情仇、无意识的显露明星歌星光鲜亮丽的生活等等，顺从的自我价值便成为了金钱至上或是权力至上。当然，不能说这样的自我价值一定是坏的，但其实大部分人都会意识到，能实现这个自我价值或是阶级的跨越的人依然是少数，当工作了一段时间，或是经历了几次失败后发现怎么也不会成功，一部分人就会失去这种顺从的自我价值，有的会陷入虚无主义，找不到人生的意义，进而进入到人生的摆烂阶段，因为他已经找不到人生的奋斗目标和意义；有的会陷入享乐主义，试图将现实中找寻不到意义的人整个的投射到虚幻的世界中，靠虚假来麻痹自己，逃避现实；还有一种是转变成<strong>反抗的自我价值</strong>，通过一种与顺从的自我价值相反的取向来建立一个新的奋斗目标。前两种其实已经让人生进入了垃圾时间，因为如果他们一旦停下便会发现，前半段人生几乎找不到什么记忆点，他的一生仿佛永远都是从今天开始的。后一种的自我价值大多是向上兼容，具体表现为例如成为科学家、追求自由、追求平等、利他性的帮助等等。</p><p>当<strong>然不论是顺从的自我价值还是反抗的自我价值，目前在本质上都受困于阶级</strong>。在资产阶级统治的社会下，顺从的自我价值就变成金钱至上；在无产阶级统治的社会下，就变成了对公平正义的追求。这里并不是说顺从的自我价值与反抗的自我价值孰优孰劣，而是希望读者在追求自我价值的同时，仔细想想以下几个问题：<strong>我们到底从哪里来？是接受自己的出生还是背叛自己的出生？我们要到哪里去？我们到底需要做些什么？</strong></p><p>就先写到这里吧。</p><p>end</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 哲学 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 哲学 </tag>
+            
+            <tag> 马克思主义 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>静止？运动？事物的发展规律</title>
+      <link href="/2025/10/05/%E5%93%B2%E5%AD%A6/%E9%9D%99%E6%AD%A2%EF%BC%9F%E8%BF%90%E5%8A%A8%EF%BC%9F%E4%BA%8B%E7%89%A9%E7%9A%84%E5%8F%91%E5%B1%95%E8%A7%84%E5%BE%8B/"/>
+      <url>/2025/10/05/%E5%93%B2%E5%AD%A6/%E9%9D%99%E6%AD%A2%EF%BC%9F%E8%BF%90%E5%8A%A8%EF%BC%9F%E4%BA%8B%E7%89%A9%E7%9A%84%E5%8F%91%E5%B1%95%E8%A7%84%E5%BE%8B/</url>
+      
+        <content type="html"><![CDATA[<blockquote><p>信安郡石室山，晋时王质伐木至，见童子数人棋而歌，质因听之。童子以一物与质，如枣核，质含之而不觉饥。俄顷，童子谓曰：“何不去？”质起视，斧柯尽烂。既归，无复时人。——南朝梁·任昉《述异记》</p></blockquote><p>说是晋朝有个王质在信安郡石室山砍柴的时候，遇到几位童子，有的在下棋，有的在唱歌。其中就有一个童子给了他一个像枣核一样的东西，王质吞下这个东西的时候，就感觉不到饥饿了。过了一会，一个童子对他说：“你怎么还不走呢？”王质这才起身，看向自己的斧子，发现木头斧柄已经完全腐烂。等他回去的时候已经沧海桑田、物是人非，没有和他同一时代的人了。</p><p><strong>怀旧空吟闻笛赋，到乡翻似烂柯人</strong>。上面便是烂柯人的典故。正如刘禹锡的这首诗一样，我们常常感叹物是人非，我们常常惊叹日新月异。时间流逝，世事变迁，许多人可能就像王质一样，忙忙碌碌一生，一回头便是沧海桑田。从古至今，我们都对事物的变化规律有着深刻的认识，可这种对时间的感叹却没有融入到对其他事物的认识上面。这就导致了我们时而『<strong>运动变化</strong> 』，时而『 <strong>静止机械</strong>』，不能客观的去看待某些问题，结果到最后反倒会得出一些错误的观点，适得其反。</p><h2 id="运动的世界">运动的世界</h2><p><strong>世界上的一切都是运动的</strong> 。你也许会惊讶：“怎么可能？你看地上的石头，我旁边的凳子，不都是静止的吗？世界上的一切怎么可能都是运动的！”朋友，先不要着急，世界上的一切的确都是 <strong>运动</strong>的，我们所看到的 <strong>静止</strong> 都只是 <strong>相对静止</strong>。我们的眼睛只能看到周围的一圈，我们的思维不要被我们的眼睛“ 束缚”住了，将思维扩大，扩大到地球这个整体上面，地球是保持自转的，那么地球上的凳子呢？是不是在做圆周运动呢？再将思维放大一些，扩大到太阳系，地球是围绕着太阳转的，那么地球上的凳子呢？再放大到时间尺度上，100年后，这个凳子还是原来的凳子吗？人到成年以后，身上的细胞还是你原来的那些吗？放大到社会，1000年前的社会和现在一样吗？就连孔老夫子的学说，1000 年后也变了味道了。</p><p>从上面的例子我们可以知道，世界的确是运动的，这是我们接下来所提的一些说法的基础，所以还是有必要在此说明一下的。</p><h2 id="机械唯物主义死板的变动">机械唯物主义————死板的变动</h2><p>一只鸡昨天生了五个蛋，今天生了六个蛋，这是<strong>数量上的变动</strong>；一个杯子，被我从一个地方移到了另一个地方，这是<strong>位置上的变动</strong> 。机械唯物主义主张“ 机械的变动”，在他们看来，物体本身是没有变动的，是『 死』的，只有外力作用的情况下，才会发生变动。机械唯物主义自 16 世纪兴起，在17 、 18世纪的哲学界占了支配的地位，能取得如此辉煌的战果，必有其优秀的地方。例如其对唯心主义和宗教的打击，对自然科学的推进，都起到了不小的作用。但是在21 世纪的今天，这种机械唯物主义的思想其实有些落后了的。</p><p>可能有了解这方面的读者要说了“大胆！笛卡尔能有错吗？拉普拉斯能有错吗？（机械唯物主义的代表人物）”在此，笔者无意去质疑这些历史人物的科学成就，也十分肯定他们在历史上所做出的不可磨灭的贡献，以及我也十分肯定这种思想在历史上的伟大贡献。所以为了解释这一段，请原谅笔者在还没有写清楚体系的时候，先引入一个概念————<strong>事物是不断向上变化发展的</strong> 。</p><p><strong>事物是不断向上变化发展的，就连哲学思想也是如此</strong>。这句话在很小的时间尺度我们感受不到，所以可能有人并不感冒，甚至不太认可这句话。但如果我们把时间尺度拉长呢？从历史的角度来看我们整个世界和社会呢？不管是达尔文的《进化论 》还是我们人类社会乃至政治制度的变迁都在诉说着一件事：<strong>我们的世界是不断进步的</strong>。从猴子————人、从奴隶制————封建制————民主制，无不证明我们的世界是在不断进步的，在这其中，一切的一切都符合一个规律<strong>贴合自然发展规律的部分会蓬勃生长，违背自然发展规律的部分会逐渐消亡</strong>。</p><p>以法国大革命为例：</p><table><colgroup><col style="width: 23%" /><col style="width: 76%" /></colgroup><thead><tr><th style="text-align: center;">时间线</th><th style="text-align: left;">事件</th></tr></thead><tbody><tr><td style="text-align: center;">1789年5月5日</td><tdstyle="text-align: left;">三级会议召开，后改名“制宪会议”（第三等级）</td></tr><tr><td style="text-align: center;">1789年7月14日</td><td style="text-align: left;">巴黎人民攻占巴士底监狱（爆发）</td></tr><tr><td style="text-align: center;">1789年8月26日</td><td style="text-align: left;">《人权宣言》（君主立宪派）</td></tr><tr><td style="text-align: center;">1791年9月</td><td style="text-align: left;">《1791年宪法》—君主立宪制确立</td></tr><tr><td style="text-align: center;">1792年8月10日</td><tdstyle="text-align: left;">“八月起义”（吉伦特派：工商业资产阶级）</td></tr><tr><td style="text-align: center;">1792年9月</td><tdstyle="text-align: left;">瓦尔密村击退普军，国民公会宣布成立第一共和国</td></tr><tr><td style="text-align: center;">1793年1月</td><td style="text-align: left;">处死路易十六</td></tr><tr><td style="text-align: center;">1793年6月2日</td><td style="text-align: left;">雅各宾派掌权（中小资） 秋罗伯斯庇尔为首的公安委员会推行“恐怖政策”</td></tr><tr><td style="text-align: center;">1799年11月9日</td><tdstyle="text-align: left;">“雾月政变”，拿破仑任第一执政，颁新宪法，建立独裁统治</td></tr><tr><td style="text-align: center;">1804年3月</td><td style="text-align: left;">《法兰西民法典》（《拿破仑法典》）</td></tr><tr><td style="text-align: center;">1804年12月2日</td><td style="text-align: left;">波拿巴·拿破仑加冕，称拿破仑一世</td></tr><tr><td style="text-align: center;">1812年</td><td style="text-align: left;">兵败俄国【开始崩溃】</td></tr><tr><td style="text-align: center;">1813年10月</td><td style="text-align: left;">兵败莱比锡【开始瓦解】</td></tr><tr><td style="text-align: center;">1814年4月</td><tdstyle="text-align: left;">拿破仑在巴黎枫丹白露宫签署退位诏书，此前两天拿破仑宣布无条件投降。法兰西第一帝国灭亡了。拿破仑后被放逐厄尔巴岛</td></tr><tr><td style="text-align: center;">1815年3月20日</td><td style="text-align: left;">拿破仑重登皇位</td></tr><tr><td style="text-align: center;">1815年6月18日</td><td style="text-align: left;">滑铁卢兵败</td></tr><tr><td style="text-align: center;">1815年6月22日</td><tdstyle="text-align: left;">拿破仑退位，不久被流放圣赫勒拿岛【第一帝国最终覆灭、波旁王朝复辟】</td></tr><tr><td style="text-align: center;">1824年</td><td style="text-align: left;">查理十世继位</td></tr><tr><td style="text-align: center;">1830年7月</td><td style="text-align: left;">查理十世签《七月赦令》【导火线】</td></tr><tr><td style="text-align: center;">1830年7月27日</td><td style="text-align: left;">“七月革命”（~7.29“光荣的三日”）{大资}</td></tr><tr><td style="text-align: center;">1830年7月29日</td><td style="text-align: left;">路易·菲利浦被推上王位，三色旗为国旗</td></tr><tr><td style="text-align: center;">1831年和1834年</td><td style="text-align: left;">里昂工人起义</td></tr><tr><td style="text-align: center;">1847年</td><td style="text-align: left;">欧洲农业歉收</td></tr><tr><td style="text-align: center;">1848年2月22日-24日</td><td style="text-align: left;">“二月革命”{中小资+工人}</td></tr><tr><td style="text-align: center;">1848年12月</td><tdstyle="text-align: left;">路易·拿破仑·波拿巴成为第一位普选产生的总统</td></tr><tr><td style="text-align: center;">1849年</td><td style="text-align: left;">秩序党在议会选举中大胜</td></tr><tr><td style="text-align: center;">1851年</td><tdstyle="text-align: left;">波拿巴发动军事政变，解散议会，开始独裁</td></tr><tr><td style="text-align: center;">1852年</td><td style="text-align: left;">颁布新宪法</td></tr><tr><td style="text-align: center;">1852年11月</td><td style="text-align: left;">路易·拿破仑·波拿巴登基称帝，称“拿破仑三世”。</td></tr><tr><td style="text-align: center;">1870年9月4日</td><tdstyle="text-align: left;">共和派在市政大厅宣布废黜波拿巴家族，建立共和国</td></tr><tr><td style="text-align: center;">1879年</td><tdstyle="text-align: left;">共和派赢得法国总统选举，资产阶级共和制在法兰西最终确立</td></tr></tbody></table><p>这里给出一个简单的法国大革命时间表，我们可以看到自『 自由 』、『 民主』从法国大革命开始出现，尽管会有 <strong>否定之否定</strong>（封建势力的疯狂反扑导致的暂时倒退） 但总体都是向前的，在这其中<strong>贴合自然发展规律的部分</strong> （例如自由民主方面）会蓬勃生长，<strong>违背自然发展规律的部分</strong> （例如腐朽的封建势力和思想）会逐渐消亡。有条件向上生长的事物，即使最初它的力量非常弱小，也不会被打倒！而是不断的生长，不断的生长，发展壮大！那些反动的事物，即使一开始非常强大，那也是纸老虎，因为它已经不能适应这个这个世界了，世界上的一切都会打压它，不断的削弱它的力量！即使它改良，努力去模仿向上生长的事物，但只要它的核心不变，终究有一天会被摘下虚伪的面具，被狠狠踩上一脚，告诉它：“赶快见鬼去吧！”</p><p>机械唯物主义便是这样，关于它进步的地方 『 唯物 』的部分保留了下来，而其 『 机械 』的部分却也是在发展中慢慢被摒弃，因为违背自然发展规律的部分都会慢慢的消亡。例如量子力学的出现，让我们知道，原来完全静止的粒子是不存在的！（量子力学标示着我们正式进入围观的世界，所以我们用薛定谔方程，用一个粒子出现在一个位置的概率来研究，而不是以前的简单的、单纯的位置与数量的变动）我们才恍然大悟，原来『机械的变动 』是不对的！正式为机械唯物主义敲响了丧钟。</p><p>当然，读者不必为机械唯物主义的死亡而惋惜、愤慨。世界在进步，我们现在科技的进步当然不能靠经典力学，要是放弃量子力学，转过头去研究经典力学，那不就是开科学的倒车了嘛。</p><p>人死后可以腐烂，被钉死在一个棺材里，可一个思想的死亡却不会完全的死去，它会接着产生影响，不断的反抗，好像说：“我不能这么快死去！”但这也是十分的可惜，落后的东西总是会慢慢的消退，总有一天，我们会举行一场隆重的告别仪式来庆祝它的『 逝去 』。</p><h2 id="最后的最后做一个小小的总结">最后的最后，做一个小小的总结</h2><p>说了这么多，我们到底说了些什么？</p><p>其实就两点，一个是 <strong>运动</strong> ，一个是<strong>发展</strong> 。 <strong>世界上的一切都是运动的</strong>，所以我们不能太 『 死板 』。就像我们常说：“当你看见屋里有蟑螂的时候，实际上已经有一窝了。”这其实就包含着运动的思想，因为蟑螂不是死板的动物，它们会去发展、生育，而不是坐等人们来消灭它。如果放任不管，认为它们掀不起什么风浪，那后面想要消灭它们的时候，就要吃大苦头了。最后就是<strong>事物是不断向上变化发展的，其中贴合自然发展规律的部分会蓬勃生长，违背自然发展规律的部分会逐渐消亡</strong>。就如我所举的法国大革命的例子那般，也有一句俗话：历史的车轮滚滚向前。也是如此。</p><p>以上就是辩证法唯物论的世界运动论或世界发展原理的简单论述。</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 哲学 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 哲学 </tag>
+            
+            <tag> 马克思主义 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>git pull不成功？git branch不能显示？这里是解决办法！</title>
+      <link href="/2025/08/14/%E7%BD%91%E7%BB%9C%E6%8A%80%E6%9C%AF/git-pull%E4%B8%8D%E6%88%90%E5%8A%9F%EF%BC%9Fgit-branch%E4%B8%8D%E8%83%BD%E6%98%BE%E7%A4%BA%EF%BC%9F%E8%BF%99%E9%87%8C%E6%98%AF%E8%A7%A3%E5%86%B3%E5%8A%9E%E6%B3%95%EF%BC%81/"/>
+      <url>/2025/08/14/%E7%BD%91%E7%BB%9C%E6%8A%80%E6%9C%AF/git-pull%E4%B8%8D%E6%88%90%E5%8A%9F%EF%BC%9Fgit-branch%E4%B8%8D%E8%83%BD%E6%98%BE%E7%A4%BA%EF%BC%9F%E8%BF%99%E9%87%8C%E6%98%AF%E8%A7%A3%E5%86%B3%E5%8A%9E%E6%B3%95%EF%BC%81/</url>
+      
+        <content type="html"><![CDATA[<p>在更新 <code>butterfly</code> 主题时，执行 <code>git pull</code>命令却发现提示错误：</p><figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">F:\<span class="title">flytotmoon</span>&gt;<span class="title">git</span> <span class="title">pull</span></span></span><br><span class="line"><span class="function"><span class="title">There</span> <span class="title">is</span> <span class="title">no</span> <span class="title">tracking</span> <span class="title">information</span> <span class="title">for</span> <span class="title">the</span> <span class="title">current</span> <span class="title">branch</span>.</span></span><br><span class="line"><span class="function"><span class="title">Please</span> <span class="title">specify</span> <span class="title">which</span> <span class="title">branch</span> <span class="title">you</span> <span class="title">want</span> <span class="title">to</span> <span class="title">merge</span> <span class="title">with</span>.</span></span><br><span class="line"><span class="function"><span class="title">See</span> <span class="title">git</span>-<span class="title">pull</span>(1) <span class="title">for</span> <span class="title">details</span>.</span></span><br><span class="line"><span class="function"></span></span><br><span class="line"><span class="function">    <span class="title">git</span> <span class="title">pull</span> &lt;<span class="title">remote</span>&gt; &lt;<span class="title">branch</span>&gt;</span></span><br><span class="line"><span class="function"></span></span><br><span class="line"><span class="function"><span class="title">If</span> <span class="title">you</span> <span class="title">wish</span> <span class="title">to</span> <span class="title">set</span> <span class="title">tracking</span> <span class="title">information</span> <span class="title">for</span> <span class="title">this</span> <span class="title">branch</span> <span class="title">you</span> <span class="title">can</span> <span class="title">do</span> <span class="title">so</span> <span class="title">with</span>:</span></span><br><span class="line"><span class="function"></span></span><br><span class="line"><span class="function">    <span class="title">git</span> <span class="title">branch</span> --<span class="title">set</span>-<span class="title">upstream</span>-<span class="title">to</span>=&lt;<span class="title">remote</span>&gt;/&lt;<span class="title">branch</span>&gt; <span class="title">master</span></span></span><br></pre></td></tr></table></figure><p>这可要了老命了，答主赶快查攻略，网上给出了一个解决办法：</p><figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git branch --<span class="built_in">set</span>-upstream-to=origin/develop develop</span><br><span class="line">git pull</span><br></pre></td></tr></table></figure><p>注： <code>develop</code> 为远程分支和本地分支。</p><p>于是答主又开始匆匆忙忙执行 <code>git branch -a</code>的命令，试图找到自己的远程分支和本地分支。</p><p>结果一出来就傻眼了， <strong>命令执行出来为空</strong> ！</p><figure><imgsrc="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20250814231246.png"alt="就像这样" /><figcaption aria-hidden="true">就像这样</figcaption></figure><p>俺一寻思，我可能就没有本地分支和远程分支呀，还有一种原因就是因为某些情况，本地分支&amp;远程分支不显示。</p><p>在我用了 <code>git add .</code> 与 <code>git commit</code>无果后，只能用一个粗暴的解决办法！将 <code>.git</code>文件删掉！重新执行 <code>git init</code>命令！之后又经过一系列操作重新有了本地&amp;远程分支！</p><p>不说废话了！直接给命令！</p><figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">git init #建立git仓库</span><br><span class="line">git add .</span><br><span class="line">git submodule add url #url就算要添加的子仓库的地址</span><br><span class="line">git status</span><br><span class="line">git commit -m &quot;add log&quot;</span><br><span class="line">git remote add origin https://github.com/你的用户名/你的用户名.github.io.git</span><br><span class="line">git branch -a #到了这一步，已经可以查看分支了（这就是查分支的命令）</span><br><span class="line">git pull origin master #master为你的分支 </span><br><span class="line">git branch --<span class="built_in">set</span>-upstream-to=origin/master master #master为你的分支</span><br><span class="line">git pull</span><br></pre></td></tr></table></figure><p>现在你就能发现！</p><h1 id="可以升级了">可以升级了！</h1>]]></content>
+      
+      
+      <categories>
+          
+          <category> 网络技术 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 技术 </tag>
+            
+            <tag> markdown </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>再读《实践论》</title>
+      <link href="/2025/08/14/%E5%93%B2%E5%AD%A6/%E5%86%8D%E8%AF%BB%E3%80%8A%E5%AE%9E%E8%B7%B5%E8%AE%BA%E3%80%8B/"/>
+      <url>/2025/08/14/%E5%93%B2%E5%AD%A6/%E5%86%8D%E8%AF%BB%E3%80%8A%E5%AE%9E%E8%B7%B5%E8%AE%BA%E3%80%8B/</url>
+      
+        <content type="html"><![CDATA[<h1 id="再读实践论">再读实践论</h1><blockquote><p>人是怎么认识这个世界的 ？又是怎么去改变这个世界的？许多人可能下意识的会认为这个问题很简单，可如果我们动脑细想却又会感觉到十分的棘手。在遥远的37年，那个战火纷飞的年代，有人便用笔回应了这个问题，写下了《实践论》。恰逢八一建军节，在重读这篇文章时，又多了许多的感悟，俗话说：常看常新。借用《实践论》中一句话：<code>认识从实践始，经过实践得到了理论的认识，还须再回到实践去</code>。借着这个机会作 再读《实践论》 ，将我的感悟记录下来。</p><p>——题记</p></blockquote><h2id="认识人们的认识不论对于自然界方面对于社会方面也都是一步又一步地由低级向高级发展即由浅入深由片面到更多的方面">认识『人们的认识，不论对于自然界方面，对于社会方面，也都是一步又一步地由低级向高级发展，即由浅入深，由片面到更多的方面』</h2><p><strong>人是怎么认识这个世界的</strong>？一个呱呱坠地的婴儿，在他睁开眼的一瞬间是一无所知的，对于他来说这个世界是陌生的，猫不是猫，狗不是狗，人不是人。随着他呆在这个世界的时间越来越长，他也逐渐脱离了懵懂无知。开始知道鼻子短，长着胡子天天睡觉打瞌睡喵喵叫的是猫咪；鼻子长，耳朵大，吐着舌头哈气天天汪汪叫的是狗。再大一点，读了许多书，接触了许多的人和事，他又会知道的更多。『<strong>认识</strong> 』这简简单单的两个字，作为人生的挚友，陪了我们一辈子，也将身世藏在了我们的一生里。只要我们看看自己，便能轻而易举的得出答案。</p><p><strong>认识是由浅入深，由感性到理性的</strong>。现在有这么一张照片，高帽子，小胡子，拄着拐杖。在刚开始看到照片的时候，你可能会疑惑，这不就是个长相普通的外国人吗？中国有句古话：一叶障目，不见泰山。在这个时候，我们的认识还是处在感性阶段，一句话叫：只知其然，不知所以然。在刚开始，我们刚刚接触一个事物，还不太了解，这时候，我们还只能用自己的眼睛、鼻子等感觉器官，来对事物做一个基本的判断。所以这个时候我们只能看到事物的表面，一句比较难听的话，就叫作『肤浅 』。没有人生来全知全能，所以我们每个人必定都会经历这么一个『<strong>肤浅</strong> 』的状态。</p><p><strong>量变产生质变，感性的累计</strong>。我们认识某些事物，是一步步积累感性，最后经过推理判断来认识其本质的。接着上一个例子，我们通过照片，对该人有了一个初步的印象。之后我们看了他的电影，了解了他是一个伟大的喜剧大师、反战斗士，最后拼凑出一个完整的人。哦，原来这就是喜剧大师——卓别林。通过我们的感性积累，形成初步的认识，最后我们通过推理判断，得到了一个完整的人，也就有了卓别林这个概念。</p><h2id="实践马克思主义者认为人类的生产活动是最基本的实践活动是决定其他一切活动的东西">实践『马克思主义者认为人类的生产活动是最基本的实践活动，是决定其他一切活动的东西』</h2><p>有句话说的好，『 社会实践是检验真理的唯一标准 』。一件事情，公说公有理，婆说婆有理，谁也不服气谁，最好的方式就是行动起来，看看谁的道理更符合世界的客观规律。『你要知道梨子的滋味，你就得变革梨子，亲口吃一吃。你要知道原子的组织同性质，你就得实行物理学和化学的实验，变革原子的情况。你要知道革命的理论和方法，你就得参加革命。』认识不能脱离实践，实践更是认识的基础。</p><p><strong>不要怕失败，实践要合乎事物的客观规律</strong>。实践是一开始就合乎事物的客观规律吗？我看未必，俗话说『 失败是成功之母』，我觉得是这样的。在一开始，你可能会失败，也可能走到完全相反的路上，但我们要因为这些东西就放弃，就畏手畏脚，到最后只会一事无成。做一件事情，有开始、经过、结果。一些同志因为没有接触过某些东西就连开始也不愿意，那么他可能一辈子都停在门外。<strong>认识始于实践，实践先于认识</strong>。门把手是一开始就有的吗？我看未必，可能是某一天，一个人觉得推拉门麻烦，便做了个凸起，之后慢慢演化成我们现在所熟知的门把手的。所以门把手这个认识是先有的吗？我们可以想到，这个认识，是后出现的，门把手的事实，也就是实践，是先出现的。世上无难事，只怕有心人。没有事情是生来就知道的，只有开始实践，你才有机会获得关于它的认识。这里我说的是有机会，因为很少有实践是一开始就合乎事物的客观规律的，也就是说，你很难一开始就成功，甚至一开始可能完全走在错误的道路上而不自知。当我们发现这种状况时，我们要做的不是硬着头皮走下去，而是知耻而后勇，及时的调整策略、方法。使自己的实践合乎事物的客观规律，只有这样，自己最后的认识或者说是推导出的理论才会合乎事物的客观规律，不至于脱离实际，成为空想家。</p><p><strong>实践作用于认识，认识再反过来作用于实践</strong> 。『辩证唯物论的认识运动，如果只到理性认识为止，那末还只说到问题的一半』。我们通过实践，获得了理性认识，此时，我们的认识就结束了吗？我看我们还没有完全解决，要完全解决，我们只有重新回到社会实践上去。将理论应用于实践，看它能不能达到自己预想的目的。许多理论之所以被称为真理，正是因为有无数后人不断实践验证得出的。历史告诉我们，许多真理都是不完全的，而我们的实践就能纠正它的不完全性和局限性。经典力学是不是真理？1900年4月27日，英国著名物理学家开尔文在英国国家皇家学会他在回顾物理学所取得的伟大成就时说，物理大厦已经落成，所剩只是一些修饰工作。同时，他在展望20世纪物理学前景时，却若有所思地讲道：“动力理论肯定了热和光是运动的两种方式，现在，它的美丽而晴朗的天空却被两朵乌云笼罩了，”“第一朵乌云出现在光的波动理论上，”“第二朵乌云出现在关于能量均分的麦克斯韦-玻尔兹曼理论上。”可没过多久，我们进入微观量子领域，发现我们之前的工作只完成了冰山一角，并非开尔文所以为的那样，只有一些修饰工作了。<strong>在很多事情上，我们的认识受制于当时的时代、知识，并不能做出完全的解释，这就是认识的局限性</strong>。那么我们要如何打破认识的局限性呢？还是实践，我们只有将认识作用于实践，实践再作用于认识，如此循环往复，才不至于被不断变化运动的世界所抛弃。19世纪的道德和21世纪的道德相同吗？19世纪的美国和21世纪的美国相同吗？世界是不断变化的，我们的认识也是不断的变化的，在『认识 』的这条波浪线上贯穿始终的一条直线就是『 实践』。实践——认识——实践——认识······循环往复，不断的改造世界，这就是辩证唯物论的知行统一观了。</p><figure><imgsrc="https://xsxtk.oss-cn-beijing.aliyuncs.com/img/20250813182149.png"alt="认识与实践的关系" /><figcaption aria-hidden="true">认识与实践的关系</figcaption></figure><h2 id="结束语">结束语</h2><p>最后就引用毛主席《实践论》中的一段话作为结尾吧。</p><p>通过实践而发现真理，又通过实践而证实真理和发展真理。从感性认识而能动地发展到理性认识，又从理性认识而能动地指导革命实践，改造主观世界和客观世界。实践、认识、再实践、再认识，这种形式，循环往复以至无穷，而实践和认识之每一循环的内容，都比较地进到了高一级的程度。这就是辩证唯物论的全部认识论，这就是辩证唯物论的知行统一观。</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 哲学 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 哲学 </tag>
+            
+            <tag> 马克思主义 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+  
+  
+</search>

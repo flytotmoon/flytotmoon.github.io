@@ -1,0 +1,582 @@
+/* ============================================================
+   flytotmoon 博客自定义美化样式（AnZhiYu 主题增强）
+   说明：本文件通过主题 inject 在 </head> 前引入，全局生效。
+   ============================================================ */
+
+/* ---------- 基础排版 ---------- */
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* 锚点定位时避开顶部导航栏 */
+#article-container h1,
+#article-container h2,
+#article-container h3,
+#article-container h4,
+#article-container h5,
+#article-container h6,
+#post-comment {
+  scroll-margin-top: 80px;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 正文排版 */
+#article-container.post-content {
+  font-size: 1.02rem;
+  letter-spacing: 0.01em;
+  word-break: break-word;
+}
+
+#article-container.post-content p {
+  margin: 0.85rem 0;
+  line-height: 1.85;
+  text-align: justify;
+}
+
+/* 标题间距与字重 */
+#article-container.post-content h1,
+#article-container.post-content h2,
+#article-container.post-content h3,
+#article-container.post-content h4 {
+  letter-spacing: 0.02em;
+  scroll-margin-top: 80px;
+}
+
+#article-container.post-content h2 {
+  margin-top: 2.2rem;
+  padding-bottom: 0.5rem;
+}
+
+#article-container.post-content h3 {
+  margin-top: 1.6rem;
+}
+
+/* ---------- 正文链接 ---------- */
+
+#article-container.post-content a:not(.headerlink):not(.fancybox) {
+  position: relative;
+  font-weight: 500;
+  transition: color 0.25s ease;
+}
+
+#article-container.post-content a:not(.headerlink):not(.fancybox)::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1.5px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 0.3s ease;
+  border-radius: 2px;
+  opacity: 0.6;
+}
+
+#article-container.post-content a:not(.headerlink):not(.fancybox):hover::after {
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+/* ---------- 图片 ---------- */
+
+#article-container.post-content img {
+  border-radius: 12px;
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.18);
+  transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.35s ease;
+}
+
+#article-container.post-content img:hover {
+  transform: translateY(-3px) scale(1.008);
+  box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.28);
+}
+
+#article-container.post-content img[src*="emoji"],
+#article-container.post-content img.inline-img,
+#article-container.post-content .twikoo img {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+#article-container.post-content img[src*="emoji"]:hover,
+#article-container.post-content img.inline-img:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* 图片描述 */
+#article-container .img-alt,
+#article-container .figcaption {
+  font-size: 0.85rem;
+  color: var(--anzhiyu-secondtext, #858585);
+  text-align: center;
+}
+
+/* ---------- 引用块 ---------- */
+
+#article-container.post-content blockquote {
+  position: relative;
+  margin: 1.2rem 0;
+  padding: 1rem 1.2rem 1rem 1.4rem;
+  border: none;
+  border-left: 4px solid var(--anzhiyu-main);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--anzhiyu-main) 6%, var(--anzhiyu-card-bg));
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+#article-container.post-content blockquote:hover {
+  box-shadow: 0 4px 14px -6px var(--anzhiyu-main-op);
+}
+
+#article-container.post-content blockquote p {
+  margin: 0.3rem 0;
+}
+
+#article-container.post-content blockquote blockquote {
+  margin: 0.5rem 0;
+}
+
+/* ---------- 行内代码 ---------- */
+
+#article-container.post-content code:not(pre code) {
+  margin: 0 3px;
+  padding: 2.5px 7px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--anzhiyu-main) 9%, var(--anzhiyu-secondbg));
+  color: var(--anzhiyu-main);
+  font-size: 0.88em;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+  transition: background 0.25s ease;
+}
+
+#article-container.post-content code:not(pre code):hover {
+  background: color-mix(in srgb, var(--anzhiyu-main) 16%, var(--anzhiyu-secondbg));
+}
+
+/* ---------- 代码块 ---------- */
+
+#article-container figure.highlight,
+#article-container pre {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.25);
+}
+
+#article-container figure.highlight {
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+#article-container figure.highlight:hover {
+  box-shadow: 0 10px 26px -10px rgba(0, 0, 0, 0.35);
+}
+
+/* 代码块内滚动条 */
+#article-container figure.highlight table::-webkit-scrollbar,
+#article-container pre::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+#article-container figure.highlight table::-webkit-scrollbar-thumb,
+#article-container pre::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--anzhiyu-main) 45%, transparent);
+  border-radius: 8px;
+}
+
+/* ---------- 表格 ---------- */
+
+#article-container.post-content table {
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px -4px rgba(0, 0, 0, 0.12);
+}
+
+#article-container.post-content table thead th {
+  background: color-mix(in srgb, var(--anzhiyu-main) 85%, var(--anzhiyu-secondbg));
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+#article-container.post-content table tbody tr {
+  transition: background 0.2s ease;
+}
+
+#article-container.post-content table tbody tr:hover {
+  background: color-mix(in srgb, var(--anzhiyu-main) 7%, transparent);
+}
+
+/* ---------- 分隔线 ---------- */
+
+#article-container.post-content hr {
+  height: 2px;
+  border: none;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--anzhiyu-main), transparent);
+  opacity: 0.55;
+}
+
+/* ---------- kbd 键盘按键 ---------- */
+
+#article-container.post-content kbd {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--anzhiyu-fontcolor) 25%, transparent);
+  border-bottom-width: 3px;
+  border-radius: 6px;
+  background: var(--anzhiyu-secondbg);
+  color: var(--anzhiyu-fontcolor);
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 0.85em;
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--anzhiyu-fontcolor) 25%, transparent);
+}
+
+/* ---------- 全局滚动条 ---------- */
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--anzhiyu-main) 55%, transparent);
+  border-radius: 8px;
+  transition: background 0.25s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--anzhiyu-main);
+}
+
+/* ---------- 首页文章卡片 ---------- */
+
+#recent-posts .recent-post-item {
+  transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  will-change: transform;
+}
+
+#recent-posts .recent-post-item:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--anzhiyu-main) 35%, transparent);
+  box-shadow: 0 14px 30px -12px var(--anzhiyu-main-op);
+}
+
+/* 首页封面图轻微放大 */
+#recent-posts .recent-post-item .post_cover img {
+  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+#recent-posts .recent-post-item:hover .post_cover img {
+  transform: scale(1.06);
+}
+
+/* ---------- 首页顶部分类卡片 ---------- */
+
+#home_top .categoryGroup .categoryItem {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+#home_top .categoryGroup .categoryItem:hover {
+  transform: translateY(-5px) scale(1.02);
+}
+
+/* ---------- 标签云 ---------- */
+
+#aside-content .card-tag-cloud a,
+#console .card-tag-cloud a {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+#aside-content .card-tag-cloud a:hover,
+#console .card-tag-cloud a:hover {
+  transform: translateY(-2px);
+  background: var(--anzhiyu-main);
+  color: #fff !important;
+  box-shadow: 0 6px 14px -6px var(--anzhiyu-main-op);
+}
+
+/* ---------- 打赏按钮 ---------- */
+
+.post-reward .reward-button {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.post-reward .reward-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px -6px var(--anzhiyu-main-op);
+}
+
+/* ---------- 归档时间线 ---------- */
+
+.article-sort-item {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.article-sort-item:hover {
+  transform: translateX(4px);
+}
+
+/* ---------- 深色模式微调 ---------- */
+
+[data-theme="dark"] #article-container.post-content blockquote {
+  background: color-mix(in srgb, var(--anzhiyu-main) 10%, var(--anzhiyu-card-bg));
+}
+
+[data-theme="dark"] #article-container.post-content img {
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- 移动端适配 ---------- */
+
+@media screen and (max-width: 768px) {
+  #recent-posts .recent-post-item:hover {
+    transform: none;
+  }
+
+  #article-container.post-content img:hover {
+    transform: none;
+  }
+
+  #article-container.post-content p {
+    text-align: left;
+  }
+}
+
+/* ---------- 「飞向月球」标题（云游君小站式竖排逐字） ---------- */
+/* 仅首页生效：由 custom.js 将标题拆分为竖向字符，衬线字重 900 + 随机字号 + 白底块 + 竖线展开动画 */
+
+#site-title.yun-banner {
+  background-image: none !important;
+  background-clip: initial;
+  -webkit-text-fill-color: initial;
+  color: #fff;
+  filter: none;
+  animation: none;
+  text-shadow: none;
+  letter-spacing: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.2rem 0;
+  /* 整体上移（默认标题位于首屏 43% 处） */
+  margin-top: -13.5rem;
+  /* 上下竖线高度：适中固定值，避免撑破 hero 布局 */
+  --yun-line-h: 2.6rem;
+}
+
+.yun-line {
+  width: 1.5px;
+  height: 0;
+  background: linear-gradient(180deg, transparent, #e6c27a 35%, #e6c27a 65%, transparent);
+}
+
+.yun-line.yun-anim {
+  animation: yun-extend-line 0.45s ease-in forwards;
+}
+
+@keyframes yun-extend-line {
+  from { height: 0; }
+  to { height: var(--yun-line-h, 2.6rem); }
+}
+
+.yun-char-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.5rem 0;
+}
+
+.yun-char-box {
+  display: flex;
+  opacity: 0;
+}
+
+.yun-char-left {
+  border-left: 1px solid #e6c27a;
+  border-right: 0 solid #e6c27a;
+  animation: yun-char-move-left 0.5s ease-out 0.35s forwards;
+}
+
+.yun-char-right {
+  border-right: 1px solid #e6c27a;
+  border-left: 0 solid #e6c27a;
+  animation: yun-char-move-right 0.5s ease-out 0.35s forwards;
+}
+
+@keyframes yun-char-move-left {
+  from { opacity: 0; border-right-width: 0; }
+  to { opacity: 1; border-right-width: var(--yun-char-size, 2rem); }
+}
+
+@keyframes yun-char-move-right {
+  from { opacity: 0; border-left-width: 0; }
+  to { opacity: 1; border-left-width: var(--yun-char-size, 2rem); }
+}
+
+/* 月光发光字：贴合暗夜背景（暖月白 + 金色光晕，无底色块） */
+.yun-char {
+  font-family: "Noto Serif SC", "Songti SC", STZhongsong, STKaiti, KaiTi, serif;
+  font-size: var(--yun-char-size, 2rem);
+  font-weight: 900;
+  line-height: 1.15;
+  padding: 0.1em 0.26em;
+  color: #f5efe0;
+  background: transparent;
+  text-shadow:
+    0 0 14px rgba(244, 208, 120, 0.5),
+    0 0 42px rgba(244, 208, 120, 0.22),
+    0 2px 8px rgba(0, 0, 0, 0.6);
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+.yun-char:hover {
+  color: #ffe9ad;
+  text-shadow:
+    0 0 18px rgba(255, 224, 150, 0.85),
+    0 0 64px rgba(255, 224, 150, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] #site-title.yun-banner {
+  --yun-line-color: #e6c27a;
+}
+
+/* 顶部导航站名：书法字 + 悬停金光 */
+#site-name {
+  letter-spacing: 0.14em;
+  font-weight: 400;
+  transition: text-shadow 0.3s ease, color 0.3s ease;
+}
+
+#site-name:hover {
+  text-shadow: 0 0 16px rgba(242, 185, 75, 0.75);
+}
+
+/* 移动端：缩小字符与字距 */
+@media screen and (max-width: 768px) {
+  #site-title.yun-banner { padding: 0.1rem 0; margin-top: -5.4rem; --yun-line-h: 1.6rem; }
+  .yun-char-container { gap: 0.22rem; padding: 0.3rem 0; }
+  .yun-char { padding: 0.1em 0.24em; }
+  #site-name { letter-spacing: 0.06em; }
+}
+
+/* ---------- 首页置顶文章：通栏条形排列 ---------- */
+
+#recent-posts > .recent-post-item.ftm-sticky-bar {
+  box-shadow: inset 3px 0 0 var(--anzhiyu-main);
+  height: 9rem !important;
+}
+
+#recent-posts > .recent-post-item.ftm-sticky-bar .post_cover {
+  width: 10rem !important;
+  height: 100% !important;
+  flex: none;
+}
+
+#recent-posts > .recent-post-item.ftm-sticky-bar > .recent-post-info {
+  height: auto !important;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#recent-posts > .recent-post-item.ftm-sticky-bar .recent-post-info-top-tips {
+  margin-top: 6px;
+}
+
+/* 条形内元信息改为文档流（主题默认绝对定位悬浮，压缩高度后会与文字重叠） */
+#recent-posts > .recent-post-item.ftm-sticky-bar > .recent-post-info > .article-meta-wrap {
+  position: static;
+  bottom: auto;
+  left: auto;
+  margin-top: 6px;
+}
+
+/* 条形中标题一行显示，整体更紧凑（不显示内容预览） */
+#recent-posts > .recent-post-item.ftm-sticky-bar > .recent-post-info .article-title {
+  -webkit-line-clamp: 1;
+}
+
+/* 桌面双列模式下：置顶文章跨两列通栏、横向排列 */
+@media screen and (min-width: 1201px) {
+  #recent-posts > .recent-post-item.ftm-sticky-bar {
+    width: 100% !important;
+    flex-direction: row !important;
+    align-items: stretch;
+  }
+}
+
+/* 移动端：小封面条形 */
+@media screen and (max-width: 768px) {
+  #recent-posts > .recent-post-item.ftm-sticky-bar {
+    height: auto !important;
+    flex-direction: row !important;
+  }
+  #recent-posts > .recent-post-item.ftm-sticky-bar .post_cover {
+    width: 6.5rem !important;
+    height: 6.5rem !important;
+  }
+}
+
+/* ---------- 导航栏右上角「管理后台」入口按钮 ---------- */
+
+.ftm-admin-btn a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ftm-admin-btn svg {
+  width: 1.12rem;
+  height: 1.12rem;
+  fill: currentColor;
+  transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.3, 1), opacity 0.25s ease;
+  opacity: 0.85;
+}
+
+.ftm-admin-btn:hover svg {
+  transform: scale(1.14);
+  opacity: 1;
+  color: var(--anzhiyu-main);
+}
+
+/* 移动端减小尺寸，避免拥挤 */
+@media screen and (max-width: 768px) {
+  .ftm-admin-btn svg { width: 1rem; height: 1rem; }
+}
+
+/* ---------- 打印样式 ---------- */
+
+@media print {
+  #aside-content,
+  #rightside,
+  #post-tools,
+  #post-comment,
+  #footer,
+  #nav,
+  .post-copyright,
+  #canvas_ribbon_wrap,
+  canvas {
+    display: none !important;
+  }
+
+  #page,
+  #body-wrap {
+    width: 100% !important;
+    padding: 0 !important;
+  }
+}

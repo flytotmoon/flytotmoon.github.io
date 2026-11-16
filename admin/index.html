@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>flytotmoon 管理后台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23d3122d'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23fff' font-family='Arial'%3E%E6%9C%88%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="style.css?v=1.10.0" />
+  <link rel="preconnect" href="https://fonts.loli.net" crossorigin />
+  <link rel="stylesheet" href="https://fonts.loli.net/css2?family=Ma+Shan+Zheng&display=swap" media="print" onload="this.media='all'" />
+</head>
+<body>
+  <!-- ============ 登录视图（知乎/B站式分屏） ============ -->
+  <div id="login-view" class="login-view hidden">
+    <div class="login-split">
+      <!-- 左侧品牌区：星空 + 月亮 + 火箭 -->
+      <aside class="login-brand">
+        <div class="login-stars" aria-hidden="true"></div>
+        <div class="login-moon" aria-hidden="true"></div>
+        <div class="login-rocket" aria-hidden="true">🚀</div>
+        <div class="login-brand-inner">
+          <div class="login-brand-logo">月</div>
+          <h1 class="login-brand-title">飞向月球</h1>
+          <p class="login-brand-sub">flytotmoon · 博客后台管理系统</p>
+          <p class="login-brand-slogan">雄关漫道真如铁，而今迈步从头越</p>
+        </div>
+        <div class="login-brand-foot">© 2025-2026 flytotmoon</div>
+      </aside>
+
+      <!-- 右侧登录面板 -->
+      <main class="login-panel">
+        <div class="login-panel-card">
+          <div class="login-head">
+            <h2>欢迎回来 👋</h2>
+            <p>登录以管理你的博客内容</p>
+          </div>
+          <div class="login-tabs">
+            <button type="button" id="tab-local" class="login-tab active">🖥️ 本机服务</button>
+            <button type="button" id="tab-github" class="login-tab">☁️ GitHub 云端</button>
+          </div>
+          <form id="login-form" autocomplete="off">
+            <label class="field">
+              <span>用户名</span>
+              <input type="text" id="login-username" placeholder="admin" required />
+            </label>
+            <label class="field">
+              <span>密码</span>
+              <input type="password" id="login-password" placeholder="请输入密码" required />
+            </label>
+            <div id="login-error" class="login-error hidden"></div>
+            <button type="submit" class="btn btn-primary btn-block" id="login-btn">登 录</button>
+            <p class="login-tip">默认账号 admin / admin123，登录后请尽快修改密码</p>
+          </form>
+          <div id="github-panel" class="hidden">
+            <label class="field">
+              <span>GitHub 访问令牌（PAT）</span>
+              <input type="password" id="gh-token" placeholder="ghp_… 或 github_pat_…" autocomplete="off" />
+            </label>
+            <div class="field-row">
+              <label class="field">
+                <span>仓库 Owner</span>
+                <input id="gh-owner" placeholder="flytotmoon" />
+              </label>
+              <label class="field">
+                <span>仓库名</span>
+                <input id="gh-repo" placeholder="flytotmoon.github.io" />
+              </label>
+            </div>
+            <div class="field-row">
+              <label class="field">
+                <span>源码分支</span>
+                <input id="gh-branch" placeholder="source" />
+              </label>
+              <label class="field">
+                <span>源码目录</span>
+                <input id="gh-prefix" placeholder="source" />
+              </label>
+            </div>
+            <div id="github-error" class="login-error hidden"></div>
+            <div class="row-btns">
+              <button type="button" class="btn" id="gh-test">🔌 连接测试</button>
+              <button type="button" class="btn btn-primary" id="gh-connect">进入后台</button>
+            </div>
+            <p class="login-tip">令牌只保存在你浏览器的 localStorage 中，不会上传到任何服务器。<br />仓库需为源码所在仓库，分支为存放 source/ 目录的分支。</p>
+          </div>
+        </div>
+        <div class="login-panel-foot">
+          <span>凭据仅保存在本机 / 浏览器本地</span>
+          <a href="https://blog.flytotmoon.cn" target="_blank" rel="noopener">返回博客 ↗</a>
+        </div>
+        <div class="login-ver">后台 v1.10.0 · 简洁界面</div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ============ 应用视图 ============ -->
+  <div id="app-view" class="app hidden">
+    <!-- 侧边栏 -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">月</div>
+        <div class="sidebar-brand-text">
+          <b>flytotmoon</b>
+          <span>管理后台</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <div class="nav-group">概览</div>
+        <a href="#/dashboard" data-route="dashboard" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+          <span>仪表盘</span>
+        </a>
+        <div class="nav-group">内容</div>
+        <a href="#/posts" data-route="posts" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+          <span>文章管理</span>
+        </a>
+        <a href="#/drafts" data-route="drafts" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+          <span>草稿箱</span>
+          <span id="draft-count-badge" class="nav-badge hidden">0</span>
+        </a>
+        <a href="#/essay" data-route="essay" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+          <span>千言万语</span>
+        </a>
+        <a href="#/album" data-route="album" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+          <span>相册集</span>
+        </a>
+        <a href="#/about" data-route="about" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5z"/></svg>
+          <span>自我介绍</span>
+        </a>
+        <div class="nav-group">站点</div>
+        <a href="#/flink" data-route="flink" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+          <span>友链管理</span>
+        </a>
+        <a href="#/equipment" data-route="equipment" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2.5 3.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm4.5 4.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm4.5 4.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg>
+          <span>我的装备</span>
+        </a>
+        <a href="#/creativity" data-route="creativity" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+          <span>创意技能</span>
+        </a>
+        <a href="#/media" data-route="media" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+          <span>媒体库</span>
+        </a>
+        <a href="#/settings" data-route="settings" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M19.14 12.94a7.07 7.07 0 0 0 .05-.94 7.07 7.07 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.3 7.3 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.49-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.5.5 0 0 0-.6.22L2.69 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.03.31-.05.63-.05.94s.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.6.22l2.39-.96c.49.38 1.03.7 1.62.94l.36 2.54c.05.24.25.42.49.42h3.84c.24 0 .44-.18.49-.42l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.23.1.48 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/></svg>
+          <span>站点设置</span>
+        </a>
+        <div class="nav-group">发布</div>
+        <a href="#/build" data-route="build" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+          <span>构建发布</span>
+          <span id="build-status-dot" class="nav-dot hidden"></span>
+        </a>
+      </nav>
+      <div class="sidebar-foot">
+        <a href="https://blog.flytotmoon.cn" target="_blank" rel="noopener" class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+          <span>查看博客</span>
+        </a>
+        <button id="logout-btn" class="nav-item nav-logout">
+          <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+          <span>退出登录</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 主区域 -->
+    <main class="main">
+      <header class="topbar">
+        <button id="sidebar-toggle" class="btn btn-icon" title="菜单">
+          <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+        </button>
+        <h2 id="page-title">仪表盘</h2>
+        <div class="topbar-right">
+          <span id="topbar-build-chip" class="build-chip hidden"></span>
+          <span class="topbar-user">
+            <span class="avatar">月</span>
+            <span id="topbar-username">admin</span>
+          </span>
+        </div>
+      </header>
+
+      <div id="page-container" class="page-container">
+        <!-- 页面由 app.js 渲染 -->
+      </div>
+    </main>
+  </div>
+
+  <div id="toast-wrap" class="toast-wrap"></div>
+  <div id="modal-root"></div>
+  <script src="fm.js?v=1.10.0"></script>
+  <script src="storage.js?v=1.10.0"></script>
+  <script src="app.js?v=1.10.0"></script>
+</body>
+</html>

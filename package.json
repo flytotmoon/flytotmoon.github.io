@@ -10,7 +10,7 @@
     "admin": "node admin/server.js",
     "admin:dev": "node admin/server.js --dev",
     "admin:reset-password": "node admin/server.js --reset-password",
-    "publish:manual": "node scripts/publish-manual.js"
+    "publish:manual": "node admin/publish-manual.js"
   },
   "hexo": {
     "version": "8.1.1"

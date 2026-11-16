@@ -153,6 +153,28 @@ node admin/server.js
 「构建并部署」时触发，自动执行 `npm ci → hexo generate → 推送 public 到 master`，
 博客在 2~5 分钟内更新。构建状态在后台「构建发布」页自动轮询显示。
 
+### Actions 跑不起来时（手动发布兜底）
+
+如果后台保存成功、但博客迟迟不更新，先去
+`https://github.com/<owner>/<repo>/actions` 看最近的运行：
+
+| 现象 | 含义 | 处理 |
+| --- | --- | --- |
+| 运行 **2~4 秒**就失败、点进去**没有步骤** | 作业没启动，账号/额度问题 | 打开 Settings → Billing and plans 处理账单；账号被锁定时（提示 `your account is locked due to a billing issue`）所有工作流都不会启动 |
+| 有红色步骤（检出/安装/构建/部署） | 构建链路出错 | 展开那一步的日志，按报错修 |
+
+工作流不可用时，用本地一条命令即可发布（产物与 Actions 完全一致，含 `.nojekyll`）：
+
+```bash
+npm run publish:manual                 # hexo 构建 + 强制推送到 master
+npm run publish:manual -- --dry-run     # 只构建并打印，不推送
+npm run publish:manual -- --skip-build  # 用现有 public/ 直接发布
+npm run publish:manual -- --branch gh-pages   # 指定目标分支
+```
+
+> 手动发布产生的 master 提交会在下次 Actions 成功运行时被自动覆盖，两者不会冲突。
+> GitHub 托管的 `pages build and deployment` 工作流不受账号锁定影响，所以手动发布依然能上线。
+
 ### 注意事项
 
 - **令牌只保存在你自己的浏览器 localStorage 中**，不会上传到任何第三方服务器；请勿在公共电脑使用
@@ -167,6 +189,7 @@ node admin/server.js
 ```
 admin/
 ├── server.js          # 本机模式后端服务（零依赖，单文件）
+├── publish-manual.js  # 手动发布兜底脚本（npm run publish:manual）
 ├── config.json        # 本机模式配置与凭据（自动生成，勿提交）
 ├── test-api.js        # 本机模式 API 自测脚本
 ├── backups/           # 本机模式：配置/文章改动的自动备份

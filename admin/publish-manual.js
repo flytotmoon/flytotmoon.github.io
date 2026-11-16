@@ -2,10 +2,13 @@
 /**
  * 手动发布：把 public/ 的构建产物以「孤立提交」推到 Pages 分支（默认 master）
  *
- * 用途：GitHub Actions 抽风 / 额度用尽 / 工作流失败时，作为兜底一条命令完成发布。
+ * 用途：GitHub Actions 抽风 / 账号额度或账单问题 / 工作流失败时，作为兜底一条命令完成发布。
  * 与 workflows/auto-deploy.yml 里的 peaceiris/actions-gh-pages 行为一致：
  *   - 全量覆盖目标分支（force push，孤儿提交）
  *   - 自动补 .nojekyll（否则 Pages 会用 Jekyll 处理产物）
+ *
+ * 注意：本文件放在 admin/ 而不是 scripts/，因为 Hexo 会把项目根目录的 scripts/
+ * 当作插件目录自动 require，CLI 脚本放在那里会报 "Script load failed"。
  *
  * 用法：
  *   npm run publish:manual                 # 构建并发布
@@ -35,11 +38,13 @@ const SKIP_BUILD = has('--skip-build');
 const BRANCH = valueOf('--branch', 'master');
 
 function git(args, opts = {}) {
-  return execFileSync('git', ['-C', ROOT, ...args], {
+  const out = execFileSync('git', ['-C', ROOT, ...args], {
     stdio: opts.stdio || ['ignore', 'pipe', 'inherit'],
     env: opts.env || process.env,
     maxBuffer: 64 * 1024 * 1024,
-  }).toString('utf8');
+  });
+  // stdio 为 inherit 时 execFileSync 返回 null
+  return out ? out.toString('utf8') : '';
 }
 
 function runBuild() {
@@ -85,7 +90,10 @@ function main() {
   }
 
   console.log(`▸ 推送到 origin/${BRANCH}（force）`);
-  git(['push', 'origin', `${commit}:refs/heads/${BRANCH}`, '--force'], { stdio: 'inherit' });
+  execFileSync('git', ['-C', ROOT, 'push', 'origin', `${commit}:refs/heads/${BRANCH}`, '--force'], {
+    stdio: 'inherit',
+    env: process.env,
+  });
   console.log('✓ 已发布。GitHub Pages 通常 1~2 分钟后生效（缓存最多 10 分钟）。');
   console.log('  提示：下次 Actions 成功时会自动覆盖本次发布的结果。');
 }

@@ -9,7 +9,8 @@
     "server": "hexo server",
     "admin": "node admin/server.js",
     "admin:dev": "node admin/server.js --dev",
-    "admin:reset-password": "node admin/server.js --reset-password"
+    "admin:reset-password": "node admin/server.js --reset-password",
+    "publish:manual": "node scripts/publish-manual.js"
   },
   "hexo": {
     "version": "8.1.1"
